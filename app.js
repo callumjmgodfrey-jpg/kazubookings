@@ -916,6 +916,7 @@ function isTableOccupiedAtTime(tableId, date, targetTime24) {
   );
   const targetMins = timeToMinutes(targetTime24);
   
+  // Check active bookings first
   for (const res of reservations) {
     const resStartMins = timeToMinutes(res.timeSlot);
     const resEndMins = resStartMins + BOOKING_DURATION_MINS;
@@ -923,10 +924,23 @@ function isTableOccupiedAtTime(tableId, date, targetTime24) {
     if (targetMins >= resStartMins && targetMins < resEndMins) {
       const resTableIds = res.tableId.split(",");
       if (resTableIds.includes(tableId)) {
-        return res;
+        return { ...res, isUpcoming: false };
       }
     }
   }
+  
+  // Check upcoming bookings starting within 1h 45m (105 minutes) next
+  for (const res of reservations) {
+    const resStartMins = timeToMinutes(res.timeSlot);
+    
+    if (resStartMins >= targetMins && resStartMins < targetMins + 105) {
+      const resTableIds = res.tableId.split(",");
+      if (resTableIds.includes(tableId)) {
+        return { ...res, isUpcoming: true };
+      }
+    }
+  }
+  
   return null;
 }
 
@@ -989,19 +1003,39 @@ function showTableInspectionDetails(tableId) {
     const endMStr = endM < 10 ? `0${endM}` : endM;
     const end12 = format12Hour(`${endHStr}:${endMStr}`);
     
-    infoPanel.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
-        <strong style="color: var(--color-accent); font-size: 0.95rem;">${tableInfo.name} - OCCUPIED</strong>
-        <span style="font-size: 0.75rem; background: rgba(193, 18, 31, 0.2); color: #e74c3c; border: 1px solid rgba(193, 18, 31, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Sitting</span>
-      </div>
-      <div style="margin-bottom: 0.2rem;">
-        Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
-      </div>
-      <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-        Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
-      </div>
-      ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
-    `;
+    if (activeBooking.isUpcoming) {
+      const targetMins = timeToMinutes(targetTimeStr);
+      const startMins = timeToMinutes(activeBooking.timeSlot);
+      const diffMins = startMins - targetMins;
+      
+      infoPanel.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
+          <strong style="color: var(--color-accent); font-size: 0.95rem;">${tableInfo.name} - RESERVED SOON</strong>
+          <span style="font-size: 0.75rem; background: rgba(242, 187, 5, 0.2); color: var(--color-accent); border: 1px solid rgba(242, 187, 5, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Starts in ${diffMins} min</span>
+        </div>
+        <div style="margin-bottom: 0.2rem;">
+          Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
+        </div>
+        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
+          Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
+        </div>
+        ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
+      `;
+    } else {
+      infoPanel.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
+          <strong style="color: var(--color-primary-light); font-size: 0.95rem;">${tableInfo.name} - OCCUPIED</strong>
+          <span style="font-size: 0.75rem; background: rgba(193, 18, 31, 0.2); color: #e74c3c; border: 1px solid rgba(193, 18, 31, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Sitting</span>
+        </div>
+        <div style="margin-bottom: 0.2rem;">
+          Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
+        </div>
+        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
+          Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
+        </div>
+        ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
+      `;
+    }
   } else {
     infoPanel.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
