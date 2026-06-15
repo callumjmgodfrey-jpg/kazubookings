@@ -38,8 +38,9 @@ The interactive map enforces the following rules from the bar's floor plan:
 | **4, 5, 6** | Dining Room | 4 | Cozy dining tables; require **at least 3 people** to book. |
 | **21 - 24** | Dining Room | 3 (per side) | Share Table #2 sides. Multiple parties can book different corners. |
 | **31 - 34** | Dining Room | 3 (per side) | Share Table #3 sides. Multiple parties can book different corners. |
-| **71 - 80** | Yakitori Grill | 1 (per seat) | Counter A stools. Parties of 2 booking a stool automatically block the paired stool (e.g. 75 & 76). |
-| **81 - 87** | Sake Bar | 1 (per seat) | Counter B stools. Parties of 2 booking a stool automatically block the paired stool (81/82, 83/84, 85/86). |
+| **71, 73, 75, 77, 79** | Yakitori Grill | 2 | Grill Counter tables (each represents a 2-seat pair). |
+| **81, 83, 85** | Sake Bar | 2 | Sake Bar Counter tables (each represents a 2-seat pair). |
+| **87** | Sake Bar | 1 | Single Sake Bar Counter end-stool. |
 | **91 - 93** | Courtenay Balcony | 2 | Outdoor seating overlooking Courtenay Place. |
 | **95 - 96** | Tatami Booth | 2 | Intimate indoor tatami-style tables. |
 

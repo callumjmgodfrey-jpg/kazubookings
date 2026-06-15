@@ -1,6 +1,6 @@
 /* C:\Users\callu\Documents\antigravity\focused-shannon\app.js */
 
-// Global Constant Table Definitions
+// Global Constant Table Definitions (Bar Counter seats organized in twos: 71, 73, 75...)
 const TABLES = [
   { id: "1", type: "table", minPax: 5, maxPax: 8, name: "Table 1 (Big Group Table)", section: "Dining Room" },
   { id: "4", type: "table", minPax: 3, maxPax: 4, name: "Table 4 (Dining Table)", section: "Dining Room" },
@@ -17,26 +17,18 @@ const TABLES = [
   { id: "33", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 33", section: "Sharing Table 3" },
   { id: "34", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 34", section: "Sharing Table 3" },
   
-  // Yakitori Grill Counter (A) Seats
-  { id: "71", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 71", pairId: "72", section: "Grill Counter" },
-  { id: "72", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 72", pairId: "71", section: "Grill Counter" },
-  { id: "73", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 73", pairId: "74", section: "Grill Counter" },
-  { id: "74", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 74", pairId: "73", section: "Grill Counter" },
-  { id: "75", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 75", pairId: "76", section: "Grill Counter" },
-  { id: "76", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 76", pairId: "75", section: "Grill Counter" },
-  { id: "77", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 77", pairId: "78", section: "Grill Counter" },
-  { id: "78", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 78", pairId: "77", section: "Grill Counter" },
-  { id: "79", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 79", pairId: "80", section: "Grill Counter" },
-  { id: "80", type: "seat", minPax: 1, maxPax: 1, name: "Yakitori Grill Stool 80", pairId: "79", section: "Grill Counter" },
+  // Yakitori Grill Counter (A) Seats - Organized into twos
+  { id: "71", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 71 (2 Seats)", section: "Grill Counter" },
+  { id: "73", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 73 (2 Seats)", section: "Grill Counter" },
+  { id: "75", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 75 (2 Seats)", section: "Grill Counter" },
+  { id: "77", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 77 (2 Seats)", section: "Grill Counter" },
+  { id: "79", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 79 (2 Seats)", section: "Grill Counter" },
   
-  // Sake Bar Counter (B) Seats
-  { id: "81", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 81", pairId: "82", section: "Sake Bar" },
-  { id: "82", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 82", pairId: "81", section: "Sake Bar" },
-  { id: "83", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 83", pairId: "84", section: "Sake Bar" },
-  { id: "84", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 84", pairId: "83", section: "Sake Bar" },
-  { id: "85", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 85", pairId: "86", section: "Sake Bar" },
-  { id: "86", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 86", pairId: "85", section: "Sake Bar" },
-  { id: "87", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Stool 87", pairId: null, section: "Sake Bar" },
+  // Sake Bar Counter (B) Seats - Organized into twos
+  { id: "81", type: "seat", minPax: 1, maxPax: 2, name: "Sake Bar Table 81 (2 Seats)", section: "Sake Bar" },
+  { id: "83", type: "seat", minPax: 1, maxPax: 2, name: "Sake Bar Table 83 (2 Seats)", section: "Sake Bar" },
+  { id: "85", type: "seat", minPax: 1, maxPax: 2, name: "Sake Bar Table 85 (2 Seats)", section: "Sake Bar" },
+  { id: "87", type: "seat", minPax: 1, maxPax: 1, name: "Sake Bar Table 87 (1 Seat)", section: "Sake Bar" },
   
   // Courtenay Balcony (Outside)
   { id: "91", type: "outdoor", minPax: 1, maxPax: 2, name: "Balcony Table 91", section: "Balcony" },
@@ -48,21 +40,56 @@ const TABLES = [
   { id: "96", type: "corner", minPax: 1, maxPax: 2, name: "Tatami Booth 96", section: "Tatami Booths" }
 ];
 
-// Configuration Defaults (Kazu opens at 5:00 PM for dinner)
-const DEFAULT_SETTINGS = {
-  email: "bookings@kazu.co.nz",
-  openTime: "17:00",
-  closeTime: "22:00" // Not directly used for booking limits, governed by weekday rules
+// 2 Hour slot duration (120 minutes)
+const BOOKING_DURATION_MINS = 120;
+
+// Application State
+let bookingState = {
+  step: 1,
+  date: "",
+  partySize: 2,
+  timeRange: "all",
+  timeSlot: "",
+  tableId: "",
+  guestName: "",
+  guestPhone: "",
+  guestEmail: "",
+  specialRequests: ""
 };
 
-// System settings cache
-let systemSettings = { ...DEFAULT_SETTINGS };
+// UI Elements
+const settingsDrawer = document.getElementById("settings-drawer");
+const btnToggleSettings = document.getElementById("btn-toggle-settings");
+const btnCloseSettings = document.getElementById("btn-close-settings");
+const settingsForm = document.getElementById("settings-form");
+const btnResetSettings = document.getElementById("btn-reset-settings");
 
-// Temporary variables for conflict bypass
-let pendingOverrideBooking = null;
+// Form Inputs
+const manualNameInput = document.getElementById("manual-name");
+const manualPhoneInput = document.getElementById("manual-phone");
+const manualDateInput = document.getElementById("manual-date");
+const manualTimeSelect = document.getElementById("manual-time");
+const manualPaxSelect = document.getElementById("manual-pax");
+const manualTableSelect = document.getElementById("manual-table");
+const manualNotesInput = document.getElementById("manual-notes");
+
+// Conflict modal
+const conflictModalBackdrop = document.getElementById("conflict-modal-backdrop");
+const btnModalCancel = document.getElementById("btn-modal-cancel");
+const btnModalOverride = document.getElementById("btn-modal-override");
 
 // Simulated Email logs
 let processedEmails = [];
+
+// System settings cache
+let systemSettings = {
+  email: "bookings@kazu.co.nz",
+  openTime: "17:00",
+  closeTime: "22:00"
+};
+
+// Temporary variables for conflict bypass
+let pendingOverrideBooking = null;
 
 // Initialize Page Elements
 document.addEventListener("DOMContentLoaded", () => {
@@ -72,12 +99,12 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Set default dates
   const todayStr = new Date().toISOString().split("T")[0];
-  document.getElementById("manual-date").value = todayStr;
-  document.getElementById("manual-date").min = todayStr;
+  manualDateInput.value = todayStr;
+  manualDateInput.min = todayStr;
   document.getElementById("view-date").value = todayStr;
   
   // Re-generate time slots list when date picker value changes
-  document.getElementById("manual-date").addEventListener("change", () => {
+  manualDateInput.addEventListener("change", () => {
     initFormTimeDropdowns();
   });
   
@@ -91,14 +118,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-print-sheet").addEventListener("click", () => window.print());
   
   // Settings Panel Bindings
-  document.getElementById("btn-toggle-settings").addEventListener("click", openSettingsDrawer);
-  document.getElementById("btn-close-settings").addEventListener("click", closeSettingsDrawer);
-  document.getElementById("settings-form").addEventListener("submit", saveSettings);
-  document.getElementById("btn-reset-settings").addEventListener("click", resetSettings);
+  btnToggleSettings.addEventListener("click", openSettingsDrawer);
+  btnCloseSettings.addEventListener("click", closeSettingsDrawer);
+  settingsForm.addEventListener("submit", saveSettings);
+  btnResetSettings.addEventListener("click", resetSettings);
   
   // Conflict Dialog Bindings
-  document.getElementById("btn-modal-cancel").addEventListener("click", cancelConflictBypass);
-  document.getElementById("btn-modal-override").addEventListener("click", confirmConflictBypass);
+  btnModalCancel.addEventListener("click", cancelConflictBypass);
+  btnModalOverride.addEventListener("click", confirmConflictBypass);
   
   // Email Simulator Bindings
   document.getElementById("email-preset").addEventListener("change", handleEmailPresetChange);
@@ -124,7 +151,7 @@ function format12Hour(time24) {
 function convert12hTo24h(time12) {
   const clean = time12.trim().toUpperCase();
   const match = clean.match(/^(\d+):(\d+)\s*(AM|PM)$/);
-  if (!match) return "18:00"; // fallback
+  if (!match) return "18:00";
   
   let hours = parseInt(match[1], 10);
   const minutes = match[2];
@@ -143,8 +170,7 @@ function loadSettings() {
   if (saved) {
     systemSettings = JSON.parse(saved);
   } else {
-    // First run initialization, prompt settings drawer to open
-    localStorage.setItem("kazu_system_settings", JSON.stringify(DEFAULT_SETTINGS));
+    localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
     setTimeout(() => {
       openSettingsDrawer();
       alert("Welcome! Please configure Kazu's monitored email address on first run.");
@@ -158,7 +184,7 @@ function loadSettings() {
 function saveSettings(e) {
   e.preventDefault();
   
-  systemSettings.email = document.getElementById("settings-email").value.trim() || DEFAULT_SETTINGS.email;
+  systemSettings.email = document.getElementById("settings-email").value.trim() || "bookings@kazu.co.nz";
   systemSettings.openTime = document.getElementById("settings-open-time").value;
   
   localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
@@ -166,7 +192,6 @@ function saveSettings(e) {
   document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
   closeSettingsDrawer();
   
-  // Re-init form times based on new bounds
   initFormTimeDropdowns();
   alert("Settings saved successfully!");
   renderBookingsList();
@@ -174,7 +199,11 @@ function saveSettings(e) {
 
 function resetSettings() {
   if (confirm("Reset settings to default? (Opening Hours start at 5:00 PM)")) {
-    systemSettings = { ...DEFAULT_SETTINGS };
+    systemSettings = {
+      email: "bookings@kazu.co.nz",
+      openTime: "17:00",
+      closeTime: "22:00"
+    };
     localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
     
     document.getElementById("settings-email").value = systemSettings.email;
@@ -188,24 +217,20 @@ function resetSettings() {
 
 // Populate Time dropdowns bounded by opening hours and weekday/weekend rules
 function initFormTimeDropdowns() {
-  const manualDate = document.getElementById("manual-date").value;
-  const manualTimeSelect = document.getElementById("manual-time");
+  const manualDate = manualDateInput.value;
   const settingsOpen = document.getElementById("settings-open-time");
   
-  // Generate all 24h slots
   const allSlots = [];
   for (let h = 0; h < 24; h++) {
     const hStr = h < 10 ? `0${h}` : h;
     allSlots.push(`${hStr}:00`, `${hStr}:30`);
   }
   
-  // Populate settings options once (unbounded)
   if (settingsOpen.children.length === 0) {
     allSlots.forEach(slot => {
       const opt = new Option(format12Hour(slot), slot);
       settingsOpen.add(opt);
     });
-    // Hide settings-close-time parent form group if it exists (since limits are dynamic)
     const settingsClose = document.getElementById("settings-close-time");
     if (settingsClose && settingsClose.parentElement) {
       settingsClose.parentElement.style.display = "none";
@@ -213,19 +238,15 @@ function initFormTimeDropdowns() {
   }
   
   settingsOpen.value = systemSettings.openTime;
-  
-  // Filter manual time selection by Kazu rules
   manualTimeSelect.innerHTML = "";
   
   if (!manualDate) return;
   
-  // Check day of week
   const dateObj = new Date(manualDate);
-  const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 1 is Monday ... 5 is Friday, 6 is Saturday
+  const dayOfWeek = dateObj.getDay();
   
-  // Weekdays: Sunday (0) to Thursday (4). Weekends: Friday (5) & Saturday (6)
   const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-  const maxTimeStr = isWeekend ? "20:30" : "20:00"; // Fri-Sat bookings end at 8:30 PM, Sun-Thu at 8:00 PM
+  const maxTimeStr = isWeekend ? "20:30" : "20:00";
   
   const startMins = timeToMinutes(systemSettings.openTime);
   const endMins = timeToMinutes(maxTimeStr);
@@ -241,8 +262,7 @@ function initFormTimeDropdowns() {
 
 // Populate table selections dropdown
 function initTableAssignmentDropdowns() {
-  const manualTable = document.getElementById("manual-table");
-  manualTable.innerHTML = "";
+  manualTableSelect.innerHTML = "";
   
   const sections = {};
   TABLES.forEach(t => {
@@ -256,28 +276,15 @@ function initTableAssignmentDropdowns() {
     
     tablesList.forEach(t => {
       let displayName = t.name;
-      if (t.type === "seat" && t.pairId) {
-        displayName += ` (Paired with Stool ${t.pairId})`;
-      } else if (t.type === "table") {
-        displayName += ` (Fits ${t.minPax}-${t.maxPax} pax)`;
-      } else if (t.type === "sharing") {
-        displayName += ` (Fits 1-3 pax)`;
-      } else {
-        displayName += ` (Fits 1-2 pax)`;
-      }
       optGroup.appendChild(new Option(displayName, t.id));
     });
-    manualTable.appendChild(optGroup);
+    manualTableSelect.appendChild(optGroup);
   }
 }
 
-// Toggle drawer
-function openSettingsDrawer() {
-  document.getElementById("settings-drawer").classList.add("active");
-}
-function closeSettingsDrawer() {
-  document.getElementById("settings-drawer").classList.remove("active");
-}
+// Open/Close Settings
+function openSettingsDrawer() { settingsDrawer.classList.add("active"); }
+function closeSettingsDrawer() { settingsDrawer.classList.remove("active"); }
 
 // Get reservations from local storage
 function getReservations() {
@@ -302,7 +309,7 @@ function checkConflict(tableId, date, time24, skipRefCode = null) {
       const resTableIds = res.tableId.split(",");
       const hasTableOverlap = resTableIds.some(id => targetTableIds.includes(id));
       if (hasTableOverlap) {
-        return res; // conflict found
+        return res;
       }
     }
   }
@@ -313,15 +320,14 @@ function checkConflict(tableId, date, time24, skipRefCode = null) {
 function handleManualSubmit(e) {
   e.preventDefault();
   
-  const name = document.getElementById("manual-name").value.trim();
-  const phone = document.getElementById("manual-phone").value.trim();
-  const date = document.getElementById("manual-date").value;
-  const timeSlot = document.getElementById("manual-time").value;
-  const partySize = parseInt(document.getElementById("manual-pax").value, 10);
-  const rawTableId = document.getElementById("manual-table").value;
-  const notes = document.getElementById("manual-notes").value.trim();
+  const name = manualNameInput.value.trim();
+  const phone = manualPhoneInput.value.trim();
+  const date = manualDateInput.value;
+  const timeSlot = manualTimeSelect.value;
+  const partySize = parseInt(manualPaxSelect.value, 10);
+  const tableId = manualTableSelect.value;
+  const notes = manualNotesInput.value.trim();
   
-  // Double check time validity against day bounds in case form states got out of sync
   const d = new Date(date);
   const dayOfWeek = d.getDay();
   const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
@@ -335,18 +341,10 @@ function handleManualSubmit(e) {
     return;
   }
   
-  let finalTableId = rawTableId;
-  const selectedTableInfo = TABLES.find(t => t.id === rawTableId);
-  if (partySize === 2 && selectedTableInfo.type === "seat" && selectedTableInfo.pairId) {
-    finalTableId = `${rawTableId},${selectedTableInfo.pairId}`;
-  }
-  
-  // Capacity check
-  if (selectedTableInfo.type !== "seat") {
-    if (partySize < selectedTableInfo.minPax || partySize > selectedTableInfo.maxPax) {
-      alert(`Capacity mismatch: ${selectedTableInfo.name} only accommodates ${selectedTableInfo.minPax} to ${selectedTableInfo.maxPax} guests. Please assign a suitable table.`);
-      return;
-    }
+  const selectedTableInfo = TABLES.find(t => t.id === tableId);
+  if (partySize < selectedTableInfo.minPax || partySize > selectedTableInfo.maxPax) {
+    alert(`Capacity mismatch: ${selectedTableInfo.name} only accommodates ${selectedTableInfo.minPax} to ${selectedTableInfo.maxPax} guests. Please assign a suitable table.`);
+    return;
   }
   
   const refCode = `KAZU-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -357,13 +355,13 @@ function handleManualSubmit(e) {
     date: date,
     timeSlot: timeSlot,
     partySize: partySize,
-    tableId: finalTableId,
+    tableId: tableId,
     specialRequests: notes,
     status: "Confirmed",
     hasConflict: false
   };
   
-  const conflictBooking = checkConflict(finalTableId, date, timeSlot);
+  const conflictBooking = checkConflict(tableId, date, timeSlot);
   if (conflictBooking) {
     triggerConflictModal(bookingObj, conflictBooking);
   } else {
@@ -384,12 +382,12 @@ function saveBookingDirectly(booking) {
 
 // Reset manual form
 function resetManualForm() {
-  document.getElementById("manual-name").value = "";
-  document.getElementById("manual-phone").value = "";
-  document.getElementById("manual-notes").value = "";
-  document.getElementById("manual-pax").value = "2";
-  document.getElementById("manual-date").value = new Date().toISOString().split("T")[0];
-  initFormTimeDropdowns(); // refresh dropdown options
+  manualNameInput.value = "";
+  manualPhoneInput.value = "";
+  manualNotesInput.value = "";
+  manualPaxSelect.value = "2";
+  manualDateInput.value = new Date().toISOString().split("T")[0];
+  initFormTimeDropdowns();
 }
 
 // Trigger Conflict Alert Modal
@@ -402,12 +400,12 @@ function triggerConflictModal(newBooking, existingBooking) {
   document.getElementById("conflict-new-details").innerHTML = newText;
   document.getElementById("conflict-existing-details").innerHTML = existingText;
   
-  document.getElementById("conflict-modal-backdrop").classList.add("active");
+  conflictModalBackdrop.classList.add("active");
 }
 
 function cancelConflictBypass() {
   pendingOverrideBooking = null;
-  document.getElementById("conflict-modal-backdrop").classList.remove("active");
+  conflictModalBackdrop.classList.remove("active");
 }
 
 function confirmConflictBypass() {
@@ -420,7 +418,7 @@ function confirmConflictBypass() {
     alert(`Reservation overridden & saved (Ref: ${pendingOverrideBooking.id})`);
     pendingOverrideBooking = null;
     
-    document.getElementById("conflict-modal-backdrop").classList.remove("active");
+    conflictModalBackdrop.classList.remove("active");
     resetManualForm();
     renderBookingsList();
   }
@@ -439,7 +437,6 @@ function renderBookingsList() {
   const allReservations = getReservations().filter(r => r.date === viewDate);
   const activeBookings = allReservations.filter(r => r.status !== "Cancelled");
   
-  // Stats
   const totalCovers = activeBookings.reduce((sum, r) => sum + r.partySize, 0);
   const occupiedTables = new Set();
   activeBookings.forEach(r => r.tableId.split(",").forEach(id => occupiedTables.add(id)));
@@ -449,7 +446,6 @@ function renderBookingsList() {
   document.getElementById("stat-guests").textContent = totalCovers;
   document.getElementById("stat-occupancy").textContent = `${occupancyPercentage}%`;
   
-  // Sort Chronologically
   allReservations.sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
   
   listTbody.innerHTML = "";
@@ -525,10 +521,11 @@ function renderBookingsList() {
 function formatTableDisplay(tableId) {
   const ids = tableId.split(",");
   if (ids.length > 1) {
-    const info = TABLES.find(t => t.id === ids[0]);
-    let label = "Counter Seat";
-    if (info) label = info.id.startsWith("7") ? "Yakitori Grill Counter" : "Sake Bar Counter";
-    return `Stools ${ids.join(" & ")} (${label})`;
+    const names = ids.map(id => {
+      const info = TABLES.find(t => t.id === id);
+      return info ? info.name : `Table ${id}`;
+    });
+    return names.join(", ");
   } else {
     const info = TABLES.find(t => t.id === ids[0]);
     return info ? info.name : `Table ${tableId}`;
@@ -550,7 +547,6 @@ window.changeStatus = function(refCode, newStatus) {
 // MOCK EMAIL INTEGRATION ENGINE
 // ==========================================
 
-// Predefined simulation templates (Updated dates/times matching the Kazu schedule rules)
 const EMAIL_TEMPLATES = {
   "1": {
     subject: "Table Booking Request",
@@ -569,7 +565,6 @@ const EMAIL_TEMPLATES = {
   }
 };
 
-// Handle Preset Dropdown Changes
 function handleEmailPresetChange() {
   const val = document.getElementById("email-preset").value;
   const customWrapper = document.getElementById("custom-email-wrapper");
@@ -588,7 +583,6 @@ function handleEmailPresetChange() {
   }
 }
 
-// Handle simulation execution
 function handleEmailSimulation() {
   const val = document.getElementById("email-preset").value;
   const rawText = document.getElementById("email-custom-text").value.trim();
@@ -606,14 +600,12 @@ function handleEmailSimulation() {
     sender = EMAIL_TEMPLATES[val].sender;
   }
   
-  // Parser Engine
   const parsed = parseEmailBody(rawText);
   if (!parsed) {
-    alert("Error: Could not parse booking details from the email text. Check formatting.");
+    alert("Error: Could not parse booking details from the email text.");
     return;
   }
   
-  // Validate Time Slot against business hours
   const d = new Date(parsed.date);
   const dayOfWeek = d.getDay();
   const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
@@ -623,8 +615,6 @@ function handleEmailSimulation() {
   const targetMins = timeToMinutes(parsed.timeSlot);
   
   const timeValid = (targetMins >= startMins && targetMins <= endMins);
-  
-  // Attempt to allocate table
   const allocatedTable = autoAllocateTable(parsed.partySize, parsed.date, parsed.timeSlot);
   
   const refCode = `KAZU-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -651,26 +641,22 @@ function handleEmailSimulation() {
   };
   
   if (!timeValid) {
-    // Booking outside allowed hours! Force manual review
     emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     emailLogObj.booking.specialRequests += ` [ALERT: Past Allowed Hours (${format12Hour(maxTimeStr)})]`;
     processedEmails.push(emailLogObj);
-    alert(`⚠️ Email Parsed! The requested time ${format12Hour(parsed.timeSlot)} is outside allowed hours for this date (Limits: ${format12Hour(systemSettings.openTime)} - ${format12Hour(maxTimeStr)}). Surfaced in log for review.`);
+    alert(`⚠️ Email Parsed! The requested time ${format12Hour(parsed.timeSlot)} is outside allowed hours (Limits: ${format12Hour(systemSettings.openTime)} - ${format12Hour(maxTimeStr)}). Surfaced in log for review.`);
   } else if (allocatedTable && allocatedTable.isConflicted) {
-    // Overlap exists! Add to review queue
     emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     processedEmails.push(emailLogObj);
     alert(`⚠️ Email Parsed! A booking conflict was detected for ${parsed.name} at ${format12Hour(parsed.timeSlot)}. Surfacing in log for review.`);
   } else if (!allocatedTable) {
-    // No suitable table size or all fully occupied
     emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     processedEmails.push(emailLogObj);
     alert(`⚠️ Email Parsed! No clean tables available for party of ${parsed.partySize} at ${format12Hour(parsed.timeSlot)}. Surfaced in log for manual review.`);
   } else {
-    // Clean booking: Auto-Save
     emailLogObj.status = "Auto-Saved";
     const current = getReservations();
     current.push(bookingObj);
@@ -680,11 +666,9 @@ function handleEmailSimulation() {
     alert(`✓ Email Auto-Imported! Reservation saved successfully for ${parsed.name} (Table ${allocatedTable.display}).`);
   }
   
-  // Refresh Lists
   renderEmailLog();
   renderBookingsList();
   
-  // Reset simulation selectors
   document.getElementById("email-preset").value = "0";
   document.getElementById("email-custom-text").value = "";
   document.getElementById("custom-email-wrapper").style.display = "none";
@@ -692,44 +676,28 @@ function handleEmailSimulation() {
 
 // Helper: Auto allocate a table based on rules
 function autoAllocateTable(partySize, date, timeSlot) {
-  const eligibleTables = TABLES.filter(t => {
-    if (t.type === "seat" && partySize <= 2) {
-      return true;
-    }
-    return partySize >= t.minPax && partySize <= t.maxPax;
-  });
-  
+  const eligibleTables = TABLES.filter(t => partySize >= t.minPax && partySize <= t.maxPax);
   if (eligibleTables.length === 0) return null;
   
   for (const t of eligibleTables) {
-    let checkId = t.id;
-    if (partySize === 2 && t.type === "seat" && t.pairId) {
-      checkId = `${t.id},${t.pairId}`;
-    }
-    
-    const overlap = checkConflict(checkId, date, timeSlot);
+    const overlap = checkConflict(t.id, date, timeSlot);
     if (!overlap) {
-      return { id: checkId, display: formatTableDisplay(checkId), isConflicted: false };
+      return { id: t.id, display: formatTableDisplay(t.id), isConflicted: false };
     }
   }
   
   const firstTable = eligibleTables[0];
-  let checkId = firstTable.id;
-  if (partySize === 2 && firstTable.type === "seat" && firstTable.pairId) {
-    checkId = `${firstTable.id},${firstTable.pairId}`;
-  }
-  return { id: checkId, display: formatTableDisplay(checkId), isConflicted: true };
+  return { id: firstTable.id, display: formatTableDisplay(firstTable.id), isConflicted: true };
 }
 
 // Regex parsing engine for simulated email bodies
 function parseEmailBody(bodyText) {
   try {
-    const lines = bodyText.split("\n");
     let name = "";
     let phone = "";
     let date = "";
     let timeSlot = "";
-    let partySize = 2; // default
+    let partySize = 2;
     
     const nameMatch = bodyText.match(/(?:under the name|under|name is|name:)\s*([A-Za-z\s]+)/i);
     if (nameMatch) name = nameMatch[1].trim();
