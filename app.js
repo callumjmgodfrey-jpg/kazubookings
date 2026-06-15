@@ -106,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Re-generate time slots list when date picker value changes
   manualDateInput.addEventListener("change", () => {
     initFormTimeDropdowns();
+    suggestBestTable();
   });
   
   // Initial renders
@@ -115,6 +116,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize floor plan snapshot dropdown and events
   initSnapshotTimeDropdown();
   initFloorPlanView();
+  
+  // Suggest best table on load
+  suggestBestTable();
   
   // Bind Event Listeners
   document.getElementById("phone-booking-form").addEventListener("submit", handleManualSubmit);
@@ -166,6 +170,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (snapshotTimeSelect) {
     snapshotTimeSelect.addEventListener("change", updateFloorPlanVisualState);
   }
+
+  // Auto-suggest table on manual form changes
+  manualPaxSelect.addEventListener("change", suggestBestTable);
+  manualTimeSelect.addEventListener("change", suggestBestTable);
 });
 
 // Time conversion utilities
@@ -429,6 +437,7 @@ function resetManualForm() {
   manualPaxSelect.value = "2";
   manualDateInput.value = new Date().toISOString().split("T")[0];
   initFormTimeDropdowns();
+  suggestBestTable();
 }
 
 // Trigger Conflict Alert Modal
@@ -719,8 +728,21 @@ function handleEmailSimulation() {
 
 // Helper: Auto allocate a table based on rules
 function autoAllocateTable(partySize, date, timeSlot) {
-  const eligibleTables = TABLES.filter(t => partySize >= t.minPax && partySize <= t.maxPax);
+  let eligibleTables = TABLES.filter(t => partySize >= t.minPax && partySize <= t.maxPax);
   if (eligibleTables.length === 0) return null;
+  
+  // Apply priority seating logic for party size of 2
+  if (partySize === 2) {
+    const priority = ["75", "73", "77", "71", "79", "81", "83", "87", "85", "95", "96"];
+    eligibleTables.sort((a, b) => {
+      const indexA = priority.indexOf(a.id);
+      const indexB = priority.indexOf(b.id);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return 0;
+    });
+  }
   
   for (const t of eligibleTables) {
     const overlap = checkConflict(t.id, date, timeSlot);
@@ -731,6 +753,18 @@ function autoAllocateTable(partySize, date, timeSlot) {
   
   const firstTable = eligibleTables[0];
   return { id: firstTable.id, display: formatTableDisplay(firstTable.id), isConflicted: true };
+}
+
+// Auto-suggest the best available table for the manual form inputs
+function suggestBestTable() {
+  const partySize = parseInt(manualPaxSelect.value, 10);
+  const date = manualDateInput.value;
+  const timeSlot = manualTimeSelect.value;
+  if (!date || !timeSlot) return;
+  const suggested = autoAllocateTable(partySize, date, timeSlot);
+  if (suggested) {
+    manualTableSelect.value = suggested.id;
+  }
 }
 
 // Regex parsing engine for simulated email bodies
