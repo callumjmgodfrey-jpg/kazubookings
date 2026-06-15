@@ -127,7 +127,8 @@ header {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.nav-links .active-btn {
+.nav-links .active-btn,
+.active-btn {
   color: var(--color-accent);
   border: 1px solid var(--color-accent);
   box-shadow: var(--shadow-accent-glow);
@@ -662,4 +663,97 @@ select.input-control {
     font-size: 14pt !important;
     font-weight: bold !important;
   }
+}
+
+/* Floor Plan Snapshot Map Styles */
+.floorplan-container {
+  position: relative;
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: rgba(5, 4, 6, 0.4);
+  border: 1px solid var(--border-glass);
+}
+
+.floorplan-svg {
+  display: block;
+  min-width: 650px;
+  margin: 0 auto;
+}
+
+.table-node {
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.table-node rect, .table-node circle, .table-node path {
+  transition: var(--transition-smooth);
+}
+
+.section-label {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.bar-counter-shape {
+  fill: rgba(20, 20, 25, 0.9) !important;
+  stroke: rgba(255,255,255,0.1) !important;
+}
+
+.table-text {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* State Colors for Staff Room State View */
+.table-node.free rect, 
+.table-node.free circle, 
+.table-node.free path {
+  fill: rgba(46, 204, 113, 0.15) !important;
+  stroke: #2ecc71 !important;
+  stroke-width: 1.5;
+}
+
+.table-node.free:hover rect, 
+.table-node.free:hover circle, 
+.table-node.free:hover path {
+  fill: rgba(46, 204, 113, 0.35) !important;
+  filter: drop-shadow(0px 0px 8px #2ecc71);
+}
+
+.table-node.occupied rect, 
+.table-node.occupied circle, 
+.table-node.occupied path {
+  fill: rgba(193, 18, 31, 0.25) !important;
+  stroke: #c1121f !important;
+  stroke-width: 1.5;
+}
+
+.table-node.occupied:hover rect, 
+.table-node.occupied:hover circle, 
+.table-node.occupied:hover path {
+  fill: rgba(193, 18, 31, 0.5) !important;
+  filter: drop-shadow(0px 0px 8px #c1121f);
+}
+
+.table-node.inspected rect, 
+.table-node.inspected circle, 
+.table-node.inspected path {
+  stroke: var(--color-accent) !important;
+  stroke-dasharray: none !important;
+  stroke-width: 2.5 !important;
+  filter: drop-shadow(0px 0px 10px var(--color-accent));
+}
+
+.table-node.free .table-text,
+.table-node.occupied .table-text {
+  fill: var(--color-text-light) !important;
 }

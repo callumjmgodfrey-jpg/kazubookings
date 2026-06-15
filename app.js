@@ -112,9 +112,16 @@ document.addEventListener("DOMContentLoaded", () => {
   renderBookingsList();
   renderEmailLog();
   
+  // Initialize floor plan snapshot dropdown and events
+  initSnapshotTimeDropdown();
+  initFloorPlanView();
+  
   // Bind Event Listeners
   document.getElementById("phone-booking-form").addEventListener("submit", handleManualSubmit);
-  document.getElementById("view-date").addEventListener("change", renderBookingsList);
+  document.getElementById("view-date").addEventListener("change", () => {
+    renderBookingsList();
+    updateFloorPlanVisualState();
+  });
   document.getElementById("btn-print-sheet").addEventListener("click", () => window.print());
   
   // Settings Panel Bindings
@@ -130,6 +137,35 @@ document.addEventListener("DOMContentLoaded", () => {
   // Email Simulator Bindings
   document.getElementById("email-preset").addEventListener("change", handleEmailPresetChange);
   document.getElementById("btn-simulate-email").addEventListener("click", handleEmailSimulation);
+  
+  // View Switcher Bindings
+  const btnViewList = document.getElementById("btn-view-list");
+  const btnViewFloorplan = document.getElementById("btn-view-floorplan");
+  const listViewContent = document.getElementById("list-view-content");
+  const floorplanViewContent = document.getElementById("floorplan-view-content");
+  const floorplanTimeSelector = document.getElementById("floorplan-time-selector");
+  const snapshotTimeSelect = document.getElementById("snapshot-time");
+
+  btnViewList.addEventListener("click", () => {
+    btnViewList.classList.add("active-btn");
+    btnViewFloorplan.classList.remove("active-btn");
+    listViewContent.style.display = "block";
+    floorplanViewContent.style.display = "none";
+    floorplanTimeSelector.style.display = "none";
+  });
+
+  btnViewFloorplan.addEventListener("click", () => {
+    btnViewFloorplan.classList.add("active-btn");
+    btnViewList.classList.remove("active-btn");
+    listViewContent.style.display = "none";
+    floorplanViewContent.style.display = "block";
+    floorplanTimeSelector.style.display = "flex";
+    updateFloorPlanVisualState();
+  });
+
+  if (snapshotTimeSelect) {
+    snapshotTimeSelect.addEventListener("change", updateFloorPlanVisualState);
+  }
 });
 
 // Time conversion utilities
@@ -195,6 +231,8 @@ function saveSettings(e) {
   initFormTimeDropdowns();
   alert("Settings saved successfully!");
   renderBookingsList();
+  initSnapshotTimeDropdown();
+  updateFloorPlanVisualState();
 }
 
 function resetSettings() {
@@ -212,6 +250,8 @@ function resetSettings() {
     document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
     initFormTimeDropdowns();
     renderBookingsList();
+    initSnapshotTimeDropdown();
+    updateFloorPlanVisualState();
   }
 }
 
@@ -378,6 +418,7 @@ function saveBookingDirectly(booking) {
   alert(`Reservation saved successfully for ${booking.guestName} (Ref: ${booking.id})`);
   resetManualForm();
   renderBookingsList();
+  updateFloorPlanVisualState();
 }
 
 // Reset manual form
@@ -421,6 +462,7 @@ function confirmConflictBypass() {
     conflictModalBackdrop.classList.remove("active");
     resetManualForm();
     renderBookingsList();
+    updateFloorPlanVisualState();
   }
 }
 
@@ -540,6 +582,7 @@ window.changeStatus = function(refCode, newStatus) {
     current[index].status = newStatus;
     saveAllReservations(current);
     renderBookingsList();
+    updateFloorPlanVisualState();
   }
 };
 
@@ -817,3 +860,168 @@ window.triggerEmailReview = function(refCode) {
     confirmConflictBypass = originalOverride;
   };
 };
+
+// ==========================================
+// FLOOR PLAN SNAPSHOT VIEW ENGINE
+// ==========================================
+
+let inspectedTableId = null;
+
+function initSnapshotTimeDropdown() {
+  const snapshotTimeSelect = document.getElementById("snapshot-time");
+  if (!snapshotTimeSelect) return;
+  
+  const currentVal = snapshotTimeSelect.value;
+  snapshotTimeSelect.innerHTML = "";
+
+  const startMins = timeToMinutes(systemSettings.openTime);
+  const endMins = timeToMinutes(systemSettings.closeTime || "22:00");
+
+  for (let mins = startMins; mins <= endMins; mins += 15) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const hStr = h < 10 ? `0${h}` : h;
+    const mStr = m < 10 ? `0${m}` : m;
+    const time24 = `${hStr}:${mStr}`;
+    const display = format12Hour(time24);
+    
+    snapshotTimeSelect.add(new Option(display, time24));
+  }
+
+  // Restore current value if it still exists, otherwise set to closest interval of current time
+  if (currentVal && [...snapshotTimeSelect.options].some(o => o.value === currentVal)) {
+    snapshotTimeSelect.value = currentVal;
+  } else {
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    let defaultMins = startMins;
+    
+    if (nowMins >= startMins && nowMins <= endMins) {
+      defaultMins = Math.round(nowMins / 15) * 15;
+      if (defaultMins < startMins) defaultMins = startMins;
+      if (defaultMins > endMins) defaultMins = endMins;
+    }
+    
+    const defH = Math.floor(defaultMins / 60);
+    const defM = defaultMins % 60;
+    const defHStr = defH < 10 ? `0${defH}` : defH;
+    const defMStr = defM < 10 ? `0${defM}` : defM;
+    snapshotTimeSelect.value = `${defHStr}:${defMStr}`;
+  }
+}
+
+function isTableOccupiedAtTime(tableId, date, targetTime24) {
+  const reservations = getReservations().filter(
+    r => r.date === date && r.status !== "Cancelled"
+  );
+  const targetMins = timeToMinutes(targetTime24);
+  
+  for (const res of reservations) {
+    const resStartMins = timeToMinutes(res.timeSlot);
+    const resEndMins = resStartMins + BOOKING_DURATION_MINS;
+    
+    if (targetMins >= resStartMins && targetMins < resEndMins) {
+      const resTableIds = res.tableId.split(",");
+      if (resTableIds.includes(tableId)) {
+        return res;
+      }
+    }
+  }
+  return null;
+}
+
+function updateFloorPlanVisualState() {
+  const viewDate = document.getElementById("view-date").value;
+  const snapshotTimeSelect = document.getElementById("snapshot-time");
+  if (!snapshotTimeSelect) return;
+  const targetTimeStr = snapshotTimeSelect.value;
+  
+  const tableNodes = document.querySelectorAll(".table-node");
+  tableNodes.forEach(node => {
+    const tableId = node.getAttribute("data-table-id");
+    const activeBooking = isTableOccupiedAtTime(tableId, viewDate, targetTimeStr);
+    
+    if (activeBooking) {
+      node.classList.remove("free");
+      node.classList.add("occupied");
+    } else {
+      node.classList.remove("occupied");
+      node.classList.add("free");
+    }
+  });
+  
+  if (inspectedTableId) {
+    showTableInspectionDetails(inspectedTableId);
+  }
+}
+
+function showTableInspectionDetails(tableId) {
+  const infoPanel = document.getElementById("floorplan-table-info");
+  if (!infoPanel) return;
+  
+  const viewDate = document.getElementById("view-date").value;
+  const snapshotTimeSelect = document.getElementById("snapshot-time");
+  if (!snapshotTimeSelect) return;
+  const targetTimeStr = snapshotTimeSelect.value;
+  
+  const tableInfo = TABLES.find(t => t.id === tableId);
+  if (!tableInfo) {
+    infoPanel.innerHTML = "Select a table or bar counter in the floor plan to inspect its occupancy details at the chosen time slot.";
+    return;
+  }
+  
+  const activeBooking = isTableOccupiedAtTime(tableId, viewDate, targetTimeStr);
+  
+  document.querySelectorAll(".table-node").forEach(node => {
+    if (node.getAttribute("data-table-id") === tableId) {
+      node.classList.add("inspected");
+    } else {
+      node.classList.remove("inspected");
+    }
+  });
+  
+  if (activeBooking) {
+    const start12 = format12Hour(activeBooking.timeSlot);
+    const endMins = timeToMinutes(activeBooking.timeSlot) + BOOKING_DURATION_MINS;
+    const endH = Math.floor(endMins / 60);
+    const endM = endMins % 60;
+    const endHStr = endH < 10 ? `0${endH}` : endH;
+    const endMStr = endM < 10 ? `0${endM}` : endM;
+    const end12 = format12Hour(`${endHStr}:${endMStr}`);
+    
+    infoPanel.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
+        <strong style="color: var(--color-accent); font-size: 0.95rem;">${tableInfo.name} - OCCUPIED</strong>
+        <span style="font-size: 0.75rem; background: rgba(193, 18, 31, 0.2); color: #e74c3c; border: 1px solid rgba(193, 18, 31, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Sitting</span>
+      </div>
+      <div style="margin-bottom: 0.2rem;">
+        Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
+      </div>
+      <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
+        Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
+      </div>
+      ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
+    `;
+  } else {
+    infoPanel.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
+        <strong style="color: #2ecc71; font-size: 0.95rem;">${tableInfo.name} - AVAILABLE</strong>
+        <span style="font-size: 0.75rem; background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Free</span>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--color-text-muted);">
+        No active booking at ${format12Hour(targetTimeStr)}. (Capacity: ${tableInfo.minPax}-${tableInfo.maxPax} guests)
+      </div>
+    `;
+  }
+}
+
+function initFloorPlanView() {
+  const tableNodes = document.querySelectorAll(".table-node");
+  tableNodes.forEach(node => {
+    node.addEventListener("click", () => {
+      const tableId = node.getAttribute("data-table-id");
+      inspectedTableId = tableId;
+      showTableInspectionDetails(tableId);
+    });
+  });
+}
