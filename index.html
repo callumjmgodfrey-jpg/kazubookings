@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Console | Kazu Yakitori & Sake Bar</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Navigation -->
+    <header>
+      <div class="logo">
+        <span class="logo-icon">🏮</span>
+        <span class="logo-text">Kazu Yakitori & Sake Bar</span>
+        <span style="font-size: 0.8rem; background: var(--color-primary); color: #fff; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold; letter-spacing: 0.5px;">STAFF CONSOLE</span>
+      </div>
+      <nav class="nav-links">
+        <button id="btn-toggle-settings">⚙️ Settings</button>
+      </nav>
+    </header>
+
+    <main>
+      <div class="dashboard-grid">
+        
+        <!-- Left Column: Manual Booking Entry -->
+        <section class="manual-booking-wrapper">
+          <h2 class="column-title">📞 Phone Booking</h2>
+          <div class="glass-panel column-card">
+            <form id="phone-booking-form">
+              <div class="form-group">
+                <label for="manual-name">Guest Full Name</label>
+                <input type="text" id="manual-name" class="input-control" placeholder="e.g. Kenji Tanaka" required>
+              </div>
+
+              <div class="form-group">
+                <label for="manual-phone">Contact Phone</label>
+                <input type="tel" id="manual-phone" class="input-control" placeholder="e.g. 021 555 9876" required>
+              </div>
+
+              <div class="form-group-row">
+                <div class="form-group">
+                  <label for="manual-date">Date</label>
+                  <input type="date" id="manual-date" class="input-control" required>
+                </div>
+                <div class="form-group">
+                  <label for="manual-time">Time</label>
+                  <select id="manual-time" class="input-control">
+                    <!-- Populated dynamically by JS (12h formats) -->
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group-row">
+                <div class="form-group">
+                  <label for="manual-pax">Party Size</label>
+                  <select id="manual-pax" class="input-control">
+                    <option value="1">1 Person</option>
+                    <option value="2" selected>2 People</option>
+                    <option value="3">3 People</option>
+                    <option value="4">4 People</option>
+                    <option value="5">5 People</option>
+                    <option value="6">6 People</option>
+                    <option value="7">7 People</option>
+                    <option value="8">8 People</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="manual-table">Assign Table</label>
+                  <select id="manual-table" class="input-control">
+                    <!-- Populated dynamically by JS -->
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="manual-notes">Special Requests / Notes</label>
+                <input type="text" id="manual-notes" class="input-control" placeholder="Dietary restrictions, birthdays...">
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
+                💾 Save Reservation
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <!-- Middle Column: Email Parser Integration -->
+        <section class="email-section-wrapper">
+          <h2 class="column-title">
+            <span>✉️ Email Bookings</span>
+            <span id="active-email-display" style="font-size: 0.75rem; font-family: var(--font-sans); color: var(--color-text-muted); font-weight: normal;"></span>
+          </h2>
+          
+          <!-- Mock Email Simulation Box -->
+          <div class="glass-panel column-card" style="margin-bottom: 1rem;">
+            <h3 style="font-size: 1rem; color: var(--color-accent); margin-bottom: 0.8rem; font-family: var(--font-sans);">Simulate Incoming Email</h3>
+            
+            <div class="form-group">
+              <label for="email-preset">Select Email Template</label>
+              <select id="email-preset" class="input-control">
+                <option value="0">Choose a template...</option>
+                <option value="1">Standard Request (Tanaka, 2 Pax, 6:30 PM)</option>
+                <option value="2">Conflicting Request (FPCNZ, 8 Pax, 7:30 PM - overlaps Table 1)</option>
+                <option value="3">Late Night Request (Liam, 2 Pax, 10:00 PM)</option>
+                <option value="custom">-- Paste Custom Email Text --</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="custom-email-wrapper" style="display: none;">
+              <label for="email-custom-text">Raw Email Body</label>
+              <textarea id="email-custom-text" class="input-control" rows="4" placeholder="Paste booking request details here..."></textarea>
+            </div>
+
+            <button class="btn btn-accent btn-block" id="btn-simulate-email">
+              ⚡ Simulate Email Arrival
+            </button>
+          </div>
+
+          <!-- Process Log list -->
+          <div class="glass-panel column-card" style="max-height: 350px; overflow-y: auto;">
+            <h3 style="font-size: 1rem; color: var(--color-text-light); margin-bottom: 0.8rem; font-family: var(--font-sans); display: flex; justify-content: space-between;">
+              <span>Processed Log</span>
+              <span id="log-count" style="color: var(--color-accent); font-size: 0.85rem;">(0)</span>
+            </h3>
+            
+            <div id="email-log-container">
+              <!-- Log entries appended here -->
+              <p style="color: var(--color-text-muted); font-style: italic; text-align: center; margin-top: 2rem; font-size: 0.85rem;">
+                No emails processed in this session.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Column: Daily Bookings sorted list -->
+        <section class="bookings-column">
+          <h2 class="column-title">
+            <span>📅 Reservation List</span>
+            <button class="btn btn-secondary" id="btn-print-sheet" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+              🖨️ Print Day Sheet
+            </button>
+          </h2>
+
+          <!-- Stats Summary and Date picker -->
+          <div class="glass-panel column-card" style="margin-bottom: 1rem; padding: 1.2rem;">
+            <div class="stats-bar">
+              <div class="stat-item">
+                <div class="stat-title">Bookings</div>
+                <div class="stat-number" id="stat-total">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-title">Covers</div>
+                <div class="stat-number" id="stat-guests">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-title">Occupancy</div>
+                <div class="stat-number" id="stat-occupancy">0%</div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; gap: 1rem;">
+              <label for="view-date" style="margin-bottom: 0; white-space: nowrap; font-size: 0.9rem;">Show Date:</label>
+              <input type="date" id="view-date" class="input-control" style="padding: 0.5rem 0.8rem;">
+            </div>
+          </div>
+
+          <!-- Sorted List Display -->
+          <div class="glass-panel column-card">
+            <h3 style="font-size: 1.1rem; color: var(--color-text-light); margin-bottom: 0.8rem; font-family: var(--font-sans);">
+              Bookings for: <span id="current-day-label" style="color: var(--color-accent);"></span>
+            </h3>
+
+            <div class="table-responsive">
+              <table class="bookings-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Guest Details</th>
+                    <th>Covers</th>
+                    <th>Table/Seat</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="bookings-list-tbody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+              <div id="no-bookings-msg" class="no-data-msg">
+                No active reservations for this date.
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Slide-out Settings Drawer -->
+    <div class="settings-panel" id="settings-drawer">
+      <div class="settings-header">
+        <h2 style="font-size: 1.4rem; color: var(--color-accent);">System Settings</h2>
+        <button id="btn-close-settings" style="background: none; border: none; font-size: 1.5rem; color: var(--color-text-muted); cursor: pointer;">×</button>
+      </div>
+
+      <form id="settings-form">
+        <div class="form-group">
+          <label for="settings-email">Monitored Email Address</label>
+          <input type="email" id="settings-email" class="input-control" placeholder="bookings@kazu.co.nz" required>
+        </div>
+
+        <div class="form-group-row">
+          <div class="form-group">
+            <label for="settings-open-time">Opening Time</label>
+            <select id="settings-open-time" class="input-control">
+              <!-- Time slots -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="settings-close-time">Closing Time</label>
+            <select id="settings-close-time" class="input-control">
+              <!-- Time slots -->
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+          <button type="submit" class="btn btn-primary btn-block">Apply Settings</button>
+          <button type="button" class="btn btn-secondary btn-block" id="btn-reset-settings" style="margin-top: 0.5rem; color: #e74c3c; border-color: rgba(231,76,60,0.15);">
+            Reset to Defaults
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Conflict Warning Modal overlay -->
+    <div class="modal-backdrop" id="conflict-modal-backdrop">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span>⚠️ Double-Booking Conflict</span>
+        </div>
+        <div class="modal-body">
+          <p>The table/seat configuration you selected has a booking conflict. The requested slot overlaps with an existing reservation within the **2-hour dining limit**.</p>
+          
+          <div class="modal-conflict-detail">
+            <div><strong>New Request:</strong></div>
+            <div id="conflict-new-details">John Doe at 7:00 PM (Table 5)</div>
+            
+            <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 0.5rem 0;">
+            
+            <div><strong>Existing Booking (Overlapping):</strong></div>
+            <div id="conflict-existing-details">Sato Kenji at 6:30 PM (Table 5)</div>
+          </div>
+
+          <p style="color: var(--color-accent); font-size: 0.85rem; font-weight: 500;">Please review this conflict. You can cancel and choose another table, or override and save.</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="btn-modal-cancel">Cancel Booking</button>
+          <button class="btn btn-primary" id="btn-modal-override" style="background: var(--color-accent); color: var(--color-text-dark); box-shadow: var(--shadow-accent-glow);">
+            Confirm Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
