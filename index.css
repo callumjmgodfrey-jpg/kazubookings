@@ -743,6 +743,20 @@ select.input-control {
   fill: rgba(193, 18, 31, 0.5) !important;
   filter: drop-shadow(0px 0px 8px #c1121f);
 }
+.table-node.upcoming rect, 
+.table-node.upcoming circle, 
+.table-node.upcoming path {
+  fill: rgba(242, 187, 5, 0.15) !important;
+  stroke: var(--color-accent) !important;
+  stroke-width: 1.5;
+}
+
+.table-node.upcoming:hover rect, 
+.table-node.upcoming:hover circle, 
+.table-node.upcoming:hover path {
+  fill: rgba(242, 187, 5, 0.35) !important;
+  filter: drop-shadow(0px 0px 8px var(--color-accent));
+}
 
 .table-node.inspected rect, 
 .table-node.inspected circle, 
@@ -754,6 +768,7 @@ select.input-control {
 }
 
 .table-node.free .table-text,
-.table-node.occupied .table-text {
+.table-node.occupied .table-text,
+.table-node.upcoming .table-text {
   fill: var(--color-text-light) !important;
 }

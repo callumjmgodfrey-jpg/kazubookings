@@ -989,11 +989,16 @@ function updateFloorPlanVisualState() {
     const tableId = node.getAttribute("data-table-id");
     const activeBooking = isTableOccupiedAtTime(tableId, viewDate, targetTimeStr);
     
+    // Clear all state classes
+    node.classList.remove("free", "occupied", "upcoming");
+    
     if (activeBooking) {
-      node.classList.remove("free");
-      node.classList.add("occupied");
+      if (activeBooking.isUpcoming) {
+        node.classList.add("upcoming");
+      } else {
+        node.classList.add("occupied");
+      }
     } else {
-      node.classList.remove("occupied");
       node.classList.add("free");
     }
   });
