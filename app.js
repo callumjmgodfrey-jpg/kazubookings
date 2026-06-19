@@ -108,6 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Re-generate time slots list when date picker value changes
   manualDateInput.addEventListener("change", () => {
     initFormTimeDropdowns();
+    updateTableDropdownAvailability();
     suggestBestTable();
   });
   
@@ -119,7 +120,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initSnapshotTimeDropdown();
   initFloorPlanView();
   
-  // Suggest best table on load
+  // Update availability and suggest best table on load
+  updateTableDropdownAvailability();
   suggestBestTable();
   
   // Bind Event Listeners
@@ -174,8 +176,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Auto-suggest table on manual form changes
-  manualPaxSelect.addEventListener("change", suggestBestTable);
-  manualTimeSelect.addEventListener("change", suggestBestTable);
+  manualPaxSelect.addEventListener("change", () => {
+    updateTableDropdownAvailability();
+    suggestBestTable();
+  });
+  manualTimeSelect.addEventListener("change", () => {
+    updateTableDropdownAvailability();
+    suggestBestTable();
+  });
 
   // Seating Optimizer button binding
   const btnOptimizeSeating = document.getElementById("btn-optimize-seating");
@@ -445,6 +453,7 @@ function saveBookingDirectly(booking) {
   resetManualForm();
   renderBookingsList();
   updateFloorPlanVisualState();
+  updateTableDropdownAvailability();
 }
 
 // Reset manual form
@@ -455,6 +464,7 @@ function resetManualForm() {
   manualPaxSelect.value = "2";
   manualDateInput.value = new Date().toISOString().split("T")[0];
   initFormTimeDropdowns();
+  updateTableDropdownAvailability();
   suggestBestTable();
 }
 
@@ -490,6 +500,7 @@ function confirmConflictBypass() {
     resetManualForm();
     renderBookingsList();
     updateFloorPlanVisualState();
+    updateTableDropdownAvailability();
   }
 }
 
@@ -613,6 +624,7 @@ window.changeStatus = function(refCode, newStatus) {
     saveAllReservations(current);
     renderBookingsList();
     updateFloorPlanVisualState();
+    updateTableDropdownAvailability();
   }
 };
 
@@ -785,6 +797,31 @@ function suggestBestTable() {
   const suggested = autoAllocateTable(partySize, date, timeSlot);
   if (suggested) {
     manualTableSelect.value = suggested.id;
+  }
+}
+
+function updateTableDropdownAvailability() {
+  const date = manualDateInput.value;
+  const time = manualTimeSelect.value;
+  if (!date || !time) return;
+  
+  const options = manualTableSelect.options;
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    const tableId = opt.value;
+    const tableInfo = TABLES.find(t => t.id === tableId);
+    if (!tableInfo) continue;
+    
+    const overlap = checkConflict(tableId, date, time);
+    if (overlap) {
+      opt.disabled = true;
+      if (!opt.text.endsWith(" (Occupied)")) {
+        opt.text = `${tableInfo.name} (Occupied)`;
+      }
+    } else {
+      opt.disabled = false;
+      opt.text = tableInfo.name;
+    }
   }
 }
 
@@ -1247,6 +1284,7 @@ function runSeatingOptimizer(selectedDate) {
   
   renderBookingsList();
   updateFloorPlanVisualState();
+  updateTableDropdownAvailability();
   
   document.getElementById("opt-report-date").textContent = new Date(selectedDate).toLocaleDateString("en-NZ", {
     weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
