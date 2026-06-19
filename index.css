@@ -594,8 +594,37 @@ select.input-control {
   input,
   select,
   .column-title button,
-  hr {
+  hr,
+  .stats-bar,
+  #stats-and-date-card,
+  #floorplan-view-content,
+  .bookings-table tr.status-cancelled,
+  .bookings-table th:nth-child(4),
+  .bookings-table td:nth-child(4),
+  .bookings-table th:nth-child(5),
+  .bookings-table td:nth-child(5),
+  .bookings-table td:nth-child(2) div:not(:first-child) {
     display: none !important;
+  }
+
+  #list-view-content {
+    display: block !important;
+  }
+
+  /* Customize column headers for cleaner printout */
+  .bookings-table th:nth-child(2) {
+    font-size: 0 !important;
+  }
+  .bookings-table th:nth-child(2)::after {
+    content: "Name" !important;
+    font-size: 12pt !important;
+  }
+  .bookings-table th:nth-child(3) {
+    font-size: 0 !important;
+  }
+  .bookings-table th:nth-child(3)::after {
+    content: "People" !important;
+    font-size: 12pt !important;
   }
   
   .dashboard-grid {

@@ -560,8 +560,10 @@ function renderBookingsList() {
       statusHtml = `<span class="badge-status" style="background: rgba(231,76,60,0.12); color: #e74c3c; border: 1px solid rgba(231,76,60,0.25);">${res.status}</span>`;
     }
     
+    // Set status classes for styling/printing selection
+    tr.className = `status-${res.status.toLowerCase().replace(/\s+/g, '-')}`;
     if (res.hasConflict && res.status !== "Cancelled") {
-      tr.className = "row-conflict";
+      tr.classList.add("row-conflict");
     }
     
     let actionsHtml = "";
