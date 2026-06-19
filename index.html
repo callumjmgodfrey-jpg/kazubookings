@@ -138,6 +138,7 @@
           <h2 class="column-title">
             <span>📅 Reservation Board</span>
             <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-accent" id="btn-optimize-seating" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">⚡ Optimize</button>
               <button class="btn btn-secondary active-btn" id="btn-view-list" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">📋 List</button>
               <button class="btn btn-secondary" id="btn-view-floorplan" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">🗺️ Map</button>
               <button class="btn btn-secondary" id="btn-print-sheet" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">🖨️ Print</button>
@@ -464,6 +465,41 @@
           <button class="btn btn-primary" id="btn-modal-override" style="background: var(--color-accent); color: var(--color-text-dark); box-shadow: var(--shadow-accent-glow);">
             Confirm Anyway
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Optimizer Report Modal -->
+    <div class="modal-backdrop" id="optimizer-modal-backdrop">
+      <div class="modal-box" style="border-color: var(--color-accent); box-shadow: var(--shadow-accent-glow); max-width: 580px;">
+        <div class="modal-header">
+          <span style="color: var(--color-accent);">⚡ Seating Optimization Report</span>
+        </div>
+        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+          <p style="margin-bottom: 1rem;">The system has completed the global seating re-allocation run for <strong id="opt-report-date" style="color: #fff;"></strong>.</p>
+          
+          <div class="stats-bar" style="margin-bottom: 1.2rem;">
+            <div class="stat-item">
+              <div class="stat-title">Optimized</div>
+              <div class="stat-number" id="opt-stat-total">0</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-title">Reassigned</div>
+              <div class="stat-number" id="opt-stat-moved">0</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-title">Conflicts</div>
+              <div class="stat-number" id="opt-stat-conflicts" style="color: var(--color-accent);">0</div>
+            </div>
+          </div>
+
+          <h4 style="font-size: 1rem; color: #fff; margin-bottom: 0.5rem; font-family: var(--font-sans);">Seating Allocation Changes:</h4>
+          <div id="optimizer-changes-log" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.85rem; line-height: 1.5; color: var(--color-text-muted);">
+            <!-- Log entries -->
+          </div>
+        </div>
+        <div class="modal-actions" style="margin-top: 1.5rem;">
+          <button class="btn btn-primary" id="btn-close-optimizer-report">Close Report</button>
         </div>
       </div>
     </div>

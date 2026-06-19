@@ -174,6 +174,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Auto-suggest table on manual form changes
   manualPaxSelect.addEventListener("change", suggestBestTable);
   manualTimeSelect.addEventListener("change", suggestBestTable);
+
+  // Seating Optimizer button binding
+  const btnOptimizeSeating = document.getElementById("btn-optimize-seating");
+  if (btnOptimizeSeating) {
+    btnOptimizeSeating.addEventListener("click", () => {
+      const viewDate = document.getElementById("view-date").value;
+      runSeatingOptimizer(viewDate);
+    });
+  }
+
+  const btnCloseOptimizerReport = document.getElementById("btn-close-optimizer-report");
+  if (btnCloseOptimizerReport) {
+    btnCloseOptimizerReport.addEventListener("click", () => {
+      document.getElementById("optimizer-modal-backdrop").classList.remove("active");
+    });
+  }
 });
 
 // Time conversion utilities
@@ -1097,4 +1113,153 @@ function initFloorPlanView() {
       showTableInspectionDetails(tableId);
     });
   });
+}
+
+function getTablePriorityOrder(partySize) {
+  if (partySize === 2) {
+    return ["75", "73", "77", "71", "79", "81", "83", "87", "85", "95", "96"];
+  }
+  if (partySize === 1) {
+    return ["87", "75", "73", "77", "71", "79", "81", "83", "85", "95", "96"];
+  }
+  return ["1", "4", "5", "6", "21", "22", "23", "24", "31", "32", "33", "34", "91", "92", "93", "95", "96"];
+}
+
+function runSeatingOptimizer(selectedDate) {
+  const reservations = getReservations();
+  const dayBookings = reservations.filter(r => r.date === selectedDate && r.status !== "Cancelled");
+  
+  if (dayBookings.length === 0) {
+    alert("No active reservations to optimize for this date.");
+    return;
+  }
+  
+  const originalAssignments = {};
+  dayBookings.forEach(b => {
+    originalAssignments[b.id] = b.tableId;
+  });
+  
+  const sortedBookings = [...dayBookings].sort((a, b) => {
+    if (b.partySize !== a.partySize) {
+      return b.partySize - a.partySize;
+    }
+    return a.timeSlot.localeCompare(b.timeSlot);
+  });
+  
+  const assignedList = [];
+  let reassignedCount = 0;
+  let conflictCount = 0;
+  const changesLog = [];
+  
+  const checkConflictInAssigned = (tableId, date, timeSlot) => {
+    const targetMins = timeToMinutes(timeSlot);
+    const targetTableIds = tableId.split(",");
+    
+    for (const res of assignedList) {
+      const resMins = timeToMinutes(res.timeSlot);
+      if (Math.abs(resMins - targetMins) < BOOKING_DURATION_MINS) {
+        const resTableIds = res.tableId.split(",");
+        const hasTableOverlap = resTableIds.some(id => targetTableIds.includes(id));
+        if (hasTableOverlap) {
+          return res;
+        }
+      }
+    }
+    return null;
+  };
+  
+  for (const booking of sortedBookings) {
+    const eligibleTables = TABLES.filter(t => booking.partySize >= t.minPax && booking.partySize <= t.maxPax);
+    
+    const priority = getTablePriorityOrder(booking.partySize);
+    eligibleTables.sort((a, b) => {
+      const indexA = priority.indexOf(a.id);
+      const indexB = priority.indexOf(b.id);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return 0;
+    });
+    
+    let assignedTableId = null;
+    
+    for (const t of eligibleTables) {
+      const overlap = checkConflictInAssigned(t.id, selectedDate, booking.timeSlot);
+      if (!overlap) {
+        assignedTableId = t.id;
+        booking.hasConflict = false;
+        break;
+      }
+    }
+    
+    if (!assignedTableId) {
+      if (eligibleTables.length > 0) {
+        assignedTableId = eligibleTables[0].id;
+      } else {
+        assignedTableId = "1";
+      }
+      booking.hasConflict = true;
+      conflictCount++;
+    }
+    
+    booking.tableId = assignedTableId;
+    assignedList.push(booking);
+    
+    const prevTable = originalAssignments[booking.id];
+    if (prevTable !== assignedTableId) {
+      reassignedCount++;
+      changesLog.push({
+        guestName: booking.guestName,
+        partySize: booking.partySize,
+        timeSlot: booking.timeSlot,
+        oldTable: formatTableDisplay(prevTable),
+        newTable: formatTableDisplay(assignedTableId),
+        isConflicted: booking.hasConflict
+      });
+    }
+  }
+  
+  reservations.forEach(r => {
+    if (r.date === selectedDate && r.status !== "Cancelled") {
+      const opt = assignedList.find(a => a.id === r.id);
+      if (opt) {
+        r.tableId = opt.tableId;
+        r.hasConflict = opt.hasConflict;
+      }
+    }
+  });
+  
+  saveAllReservations(reservations);
+  
+  renderBookingsList();
+  updateFloorPlanVisualState();
+  
+  document.getElementById("opt-report-date").textContent = new Date(selectedDate).toLocaleDateString("en-NZ", {
+    weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
+  });
+  document.getElementById("opt-stat-total").textContent = dayBookings.length;
+  document.getElementById("opt-stat-moved").textContent = reassignedCount;
+  document.getElementById("opt-stat-conflicts").textContent = conflictCount;
+  
+  const logContainer = document.getElementById("optimizer-changes-log");
+  if (changesLog.length === 0) {
+    logContainer.innerHTML = `<p style="text-align: center; font-style: italic; margin: 1rem 0; color: var(--color-text-muted);">Seating plan was already perfectly optimized! No changes required.</p>`;
+  } else {
+    logContainer.innerHTML = changesLog.map(change => {
+      const conflictBadge = change.isConflicted ? `<span class="badge-conflict" style="font-size: 0.65rem; padding: 0.05rem 0.2rem; margin-left: 0.4rem;">⚠️ Overlap</span>` : "";
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <div>
+            <strong style="color: #fff;">${change.guestName}</strong> (${change.partySize} pax) at ${format12Hour(change.timeSlot)}
+            ${conflictBadge}
+          </div>
+          <div style="font-family: monospace; color: var(--color-accent);">
+            ${change.oldTable} ➔ ${change.newTable}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+  
+  document.getElementById("optimizer-modal-backdrop").classList.add("active");
 }
