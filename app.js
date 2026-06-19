@@ -11,11 +11,13 @@ const TABLES = [
   { id: "22", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 2 - Corner 22", section: "Sharing Table 2" },
   { id: "23", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 2 - Corner 23", section: "Sharing Table 2" },
   { id: "24", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 2 - Corner 24", section: "Sharing Table 2" },
+  { id: "21,22,23,24", type: "table", minPax: 5, maxPax: 10, name: "Sharing Table 2 (Combined - Max 10 pax)", section: "Sharing Table 2" },
   
   { id: "31", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 31", section: "Sharing Table 3" },
   { id: "32", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 32", section: "Sharing Table 3" },
   { id: "33", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 33", section: "Sharing Table 3" },
   { id: "34", type: "sharing", minPax: 1, maxPax: 3, name: "Sharing Table 3 - Corner 34", section: "Sharing Table 3" },
+  { id: "31,32,33,34", type: "table", minPax: 5, maxPax: 10, name: "Sharing Table 3 (Combined - Max 10 pax)", section: "Sharing Table 3" },
   
   // Yakitori Grill Counter (A) Seats - Organized into twos
   { id: "71", type: "seat", minPax: 1, maxPax: 2, name: "Yakitori Grill Table 71 (2 Seats)", section: "Grill Counter" },
@@ -586,6 +588,9 @@ function renderBookingsList() {
 
 // Format table ID strings
 function formatTableDisplay(tableId) {
+  const exactMatch = TABLES.find(t => t.id === tableId);
+  if (exactMatch) return exactMatch.name;
+  
   const ids = tableId.split(",");
   if (ids.length > 1) {
     const names = ids.map(id => {
@@ -1122,7 +1127,16 @@ function getTablePriorityOrder(partySize) {
   if (partySize === 1) {
     return ["87", "75", "73", "77", "71", "79", "81", "83", "85", "95", "96"];
   }
-  return ["1", "4", "5", "6", "21", "22", "23", "24", "31", "32", "33", "34", "91", "92", "93", "95", "96"];
+  if (partySize >= 3 && partySize <= 4) {
+    return ["4", "5", "6", "21", "22", "23", "24", "31", "32", "33", "34", "91", "92", "93", "95", "96"];
+  }
+  if (partySize >= 5 && partySize <= 8) {
+    return ["1", "21,22,23,24", "31,32,33,34", "4", "5", "6"];
+  }
+  if (partySize >= 9 && partySize <= 10) {
+    return ["21,22,23,24", "31,32,33,34"];
+  }
+  return ["1", "21,22,23,24", "31,32,33,34", "4", "5", "6", "21", "22", "23", "24", "31", "32", "33", "34", "91", "92", "93", "95", "96"];
 }
 
 function runSeatingOptimizer(selectedDate) {
