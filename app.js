@@ -99,10 +99,12 @@ document.addEventListener("DOMContentLoaded", () => {
   initFormTimeDropdowns();
   initTableAssignmentDropdowns();
   
+  // Populate date dropdowns
+  initDateDropdowns();
+  
   // Set default dates
   const todayStr = new Date().toISOString().split("T")[0];
   manualDateInput.value = todayStr;
-  manualDateInput.min = todayStr;
   document.getElementById("view-date").value = todayStr;
   
   // Re-generate time slots list when date picker value changes
@@ -1462,4 +1464,28 @@ function seedTomorrowReservations() {
   renderBookingsList();
   updateFloorPlanVisualState();
   updateTableDropdownAvailability();
+}
+
+function initDateDropdowns() {
+  const manualDateSelect = document.getElementById("manual-date");
+  const viewDateSelect = document.getElementById("view-date");
+  if (!manualDateSelect || !viewDateSelect) return;
+  
+  manualDateSelect.innerHTML = "";
+  viewDateSelect.innerHTML = "";
+  
+  const today = new Date();
+  
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+    
+    let display = d.toLocaleDateString("en-NZ", { weekday: 'short', day: 'numeric', month: 'short' });
+    if (i === 0) display = `Today (${display})`;
+    else if (i === 1) display = `Tomorrow (${display})`;
+    
+    manualDateSelect.add(new Option(display, dateStr));
+    viewDateSelect.add(new Option(display, dateStr));
+  }
 }
