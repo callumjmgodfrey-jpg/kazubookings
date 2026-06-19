@@ -138,6 +138,11 @@ document.addEventListener("DOMContentLoaded", () => {
   settingsForm.addEventListener("submit", saveSettings);
   btnResetSettings.addEventListener("click", resetSettings);
   
+  const btnSeedData = document.getElementById("btn-seed-data");
+  if (btnSeedData) {
+    btnSeedData.addEventListener("click", seedTomorrowReservations);
+  }
+  
   // Conflict Dialog Bindings
   btnModalCancel.addEventListener("click", cancelConflictBypass);
   btnModalOverride.addEventListener("click", confirmConflictBypass);
@@ -1314,4 +1319,147 @@ function runSeatingOptimizer(selectedDate) {
   }
   
   document.getElementById("optimizer-modal-backdrop").classList.add("active");
+}
+
+function seedTomorrowReservations() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  
+  const mockBookings = [
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Kenji Sato",
+      guestPhone: "027 493 2847",
+      date: tomorrowStr,
+      timeSlot: "17:30",
+      partySize: 2,
+      tableId: "75",
+      specialRequests: "Preferred Sake selection.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Yuki Matsuura",
+      guestPhone: "022 431 8765",
+      date: tomorrowStr,
+      timeSlot: "18:00",
+      partySize: 2,
+      tableId: "75",
+      specialRequests: "Regular guest.",
+      status: "Confirmed",
+      hasConflict: true
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Satomi Takahashi",
+      guestPhone: "021 987 6543",
+      date: tomorrowStr,
+      timeSlot: "19:00",
+      partySize: 2,
+      tableId: "75",
+      specialRequests: "Birthday celebration.",
+      status: "Confirmed",
+      hasConflict: true
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "John Doe Group",
+      guestPhone: "027 555 1234",
+      date: tomorrowStr,
+      timeSlot: "18:30",
+      partySize: 8,
+      tableId: "1",
+      specialRequests: "Big group table.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Jane Smith Family",
+      guestPhone: "022 555 5678",
+      date: tomorrowStr,
+      timeSlot: "18:00",
+      partySize: 4,
+      tableId: "4",
+      specialRequests: "High chair needed.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Hiroshi Tanaka",
+      guestPhone: "021 555 9999",
+      date: tomorrowStr,
+      timeSlot: "19:15",
+      partySize: 2,
+      tableId: "73",
+      specialRequests: "Near the grill.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Alice Cooper",
+      guestPhone: "027 555 8888",
+      date: tomorrowStr,
+      timeSlot: "17:00",
+      partySize: 3,
+      tableId: "4",
+      specialRequests: "Window seat preferred.",
+      status: "Confirmed",
+      hasConflict: true
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "FPCNZ Corporate",
+      guestPhone: "04 802 4868",
+      date: tomorrowStr,
+      timeSlot: "19:30",
+      partySize: 10,
+      tableId: "21,22,23,24",
+      specialRequests: "Corporate dinner, premium sake.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Sake Club Wellington",
+      guestPhone: "021 555 7777",
+      date: tomorrowStr,
+      timeSlot: "20:00",
+      partySize: 6,
+      tableId: "31,32,33,34",
+      specialRequests: "Sake tasting event.",
+      status: "Confirmed",
+      hasConflict: false
+    },
+    {
+      id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
+      guestName: "Liam O'Connor",
+      guestPhone: "022 555 3333",
+      date: tomorrowStr,
+      timeSlot: "20:30",
+      partySize: 2,
+      tableId: "87",
+      specialRequests: "Late night yakitori.",
+      status: "Confirmed",
+      hasConflict: false
+    }
+  ];
+  
+  const currentReservations = getReservations().filter(r => r.date !== tomorrowStr);
+  const updatedReservations = [...currentReservations, ...mockBookings];
+  
+  saveAllReservations(updatedReservations);
+  
+  alert(`Successfully seeded 10 mock reservations for tomorrow (${tomorrowStr})!`);
+  
+  closeSettingsDrawer();
+  
+  document.getElementById("view-date").value = tomorrowStr;
+  renderBookingsList();
+  updateFloorPlanVisualState();
+  updateTableDropdownAvailability();
 }
