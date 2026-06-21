@@ -587,6 +587,7 @@ select.input-control {
   .modal-backdrop,
   .action-btn-group,
   th:last-child, /* Actions column header */
+  th:last-child, /* Actions column header */
   td:last-child,  /* Actions column cells */
   button,
   .btn,
@@ -599,10 +600,9 @@ select.input-control {
   #stats-and-date-card,
   #floorplan-view-content,
   .bookings-table tr.status-cancelled,
-  .bookings-table th:nth-child(4),
-  .bookings-table td:nth-child(4),
   .bookings-table th:nth-child(5),
   .bookings-table td:nth-child(5),
+  .bookings-table td:nth-child(4) .desktop-only-duration,
   .bookings-table td:nth-child(2) div:not(:first-child) {
     display: none !important;
   }
@@ -624,6 +624,13 @@ select.input-control {
   }
   .bookings-table th:nth-child(3)::after {
     content: "People" !important;
+    font-size: 12pt !important;
+  }
+  .bookings-table th:nth-child(4) {
+    font-size: 0 !important;
+  }
+  .bookings-table th:nth-child(4)::after {
+    content: "Table" !important;
     font-size: 12pt !important;
   }
   

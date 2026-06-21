@@ -740,6 +740,9 @@ function renderBookingsList() {
       actionsHtml = `<span style="font-size: 0.8rem; font-style: italic; color: var(--color-text-muted);">Cancelled</span>`;
     }
     
+    const timeDetails = getSeatingTimeDetails(res);
+    const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
+
     tr.innerHTML = `
       <td style="font-weight: bold; color: var(--color-text-light);">${format12Hour(res.timeSlot)}</td>
       <td>
@@ -750,7 +753,8 @@ function renderBookingsList() {
       <td>${res.partySize}</td>
       <td style="font-weight: 500;">
         <div>${formatTableDisplay(res.tableId)}</div>
-        <div style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: normal;">Duration: up to 2 hours</div>
+        <div style="font-size: 0.75rem; color: var(--color-accent); font-weight: 600;">Last Order: ${lastOrder12}</div>
+        <div class="desktop-only-duration" style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: normal;">Duration: up to 2 hours</div>
       </td>
       <td>
         <div style="margin-bottom: 0.2rem;">${statusHtml}</div>
@@ -1257,13 +1261,10 @@ function showTableInspectionDetails(tableId) {
   });
   
   if (activeBooking) {
+    const timeDetails = getSeatingTimeDetails(activeBooking);
     const start12 = format12Hour(activeBooking.timeSlot);
-    const endMins = timeToMinutes(activeBooking.timeSlot) + BOOKING_DURATION_MINS;
-    const endH = Math.floor(endMins / 60);
-    const endM = endMins % 60;
-    const endHStr = endH < 10 ? `0${endH}` : endH;
-    const endMStr = endM < 10 ? `0${endM}` : endM;
-    const end12 = format12Hour(`${endHStr}:${endMStr}`);
+    const end12 = format12Hour(timeDetails.endTime);
+    const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
     
     if (activeBooking.isUpcoming) {
       const targetMins = timeToMinutes(targetTimeStr);
@@ -1279,7 +1280,10 @@ function showTableInspectionDetails(tableId) {
           Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
         </div>
         <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
+          Time: <strong>${start12} - ${end12}</strong> | Last Order: <strong style="color: var(--color-accent);">${lastOrder12}</strong>
+        </div>
+        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
+          Phone: ${activeBooking.guestPhone}
         </div>
         ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
       `;
@@ -1293,7 +1297,10 @@ function showTableInspectionDetails(tableId) {
           Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
         </div>
         <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Time: <strong>${start12} - ${end12}</strong> | Phone: ${activeBooking.guestPhone}
+          Time: <strong>${start12} - ${end12}</strong> | Last Order: <strong style="color: var(--color-accent);">${lastOrder12}</strong>
+        </div>
+        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
+          Phone: ${activeBooking.guestPhone}
         </div>
         ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
       `;
@@ -2180,4 +2187,39 @@ function setupFirestoreListeners() {
     localStorage.setItem("kazu_waitlist_data", JSON.stringify(localWait));
     renderWaitlistQueue();
   });
+}
+
+// Calculates dynamic seating end times and last order limits (30 mins before end)
+function getSeatingTimeDetails(res) {
+  const startMins = timeToMinutes(res.timeSlot);
+  const reservations = getReservations().filter(r => r.date === res.date && r.status !== "Cancelled" && r.id !== res.id);
+  
+  const targetTableIds = res.tableId.split(",");
+  let nextStartMins = startMins + 120; // Default duration is 2 hours (120 mins)
+  
+  reservations.forEach(r => {
+    const rMins = timeToMinutes(r.timeSlot);
+    if (rMins > startMins && rMins < nextStartMins) {
+      const rTableIds = r.tableId.split(",");
+      const sharesTable = rTableIds.some(id => targetTableIds.includes(id));
+      if (sharesTable) {
+        nextStartMins = rMins;
+      }
+    }
+  });
+  
+  const lastOrderMins = Math.max(startMins, nextStartMins - 30);
+  
+  const formatMins = (totalMins) => {
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    const hStr = hours < 10 ? `0${hours}` : hours;
+    const mStr = mins < 10 ? `0${mins}` : mins;
+    return `${hStr}:${mStr}`;
+  };
+  
+  return {
+    endTime: formatMins(nextStartMins),
+    lastOrderTime: formatMins(lastOrderMins)
+  };
 }
