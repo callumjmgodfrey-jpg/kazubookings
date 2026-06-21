@@ -2199,7 +2199,8 @@ function getSeatingTimeDetails(res) {
   
   reservations.forEach(r => {
     const rMins = timeToMinutes(r.timeSlot);
-    if (rMins > startMins && rMins < nextStartMins) {
+    // Only truncate if the next booking starts at least 90 minutes after this one (minimum dining slot buffer)
+    if (rMins >= startMins + 90 && rMins < nextStartMins) {
       const rTableIds = r.tableId.split(",");
       const sharesTable = rTableIds.some(id => targetTableIds.includes(id));
       if (sharesTable) {
