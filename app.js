@@ -2270,11 +2270,8 @@ function getSeatingTimeDetails(res) {
   
   let lastOrderMins = Math.max(startMins, nextStartMins - 30);
   
-  // Guarantee bookings starting after 7:30 PM (19:30) have last order at 9:00 PM (21:00) and end time at 9:30 PM (21:30)
-  if (startMins > 1170) {
-    nextStartMins = Math.max(nextStartMins, 1290);
-    lastOrderMins = Math.max(lastOrderMins, 1260);
-  }
+  // Cap the latest last order at 9:00 PM (21:00 / 1260 mins)
+  lastOrderMins = Math.min(lastOrderMins, 1260);
   
   const formatMins = (totalMins) => {
     const hours = Math.floor(totalMins / 60);
