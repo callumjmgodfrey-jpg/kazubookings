@@ -518,18 +518,37 @@ function saveAllReservations(reservations) {
 }
 
 // Conflict checking engine (2-hour limit check)
-function checkConflict(tableId, date, time24, skipRefCode = null) {
+function checkConflict(tableId, date, time24, skipRefCode = null, partySize = 2) {
   const reservations = getReservations().filter(r => r.date === date && r.status !== "Cancelled" && r.id !== skipRefCode);
   const targetMins = timeToMinutes(time24);
   const targetTableIds = tableId.split(",");
   
-  for (const res of reservations) {
-    const resMins = timeToMinutes(res.timeSlot);
-    if (Math.abs(resMins - targetMins) < BOOKING_DURATION_MINS) {
-      const resTableIds = res.tableId.split(",");
-      const hasTableOverlap = resTableIds.some(id => targetTableIds.includes(id));
-      if (hasTableOverlap) {
-        return res;
+  for (const tId of targetTableIds) {
+    const tableInfo = TABLES.find(t => t.id === tId);
+    if (!tableInfo) continue;
+    
+    // Collect all overlapping reservations for this specific table ID
+    const overlappingRes = [];
+    for (const res of reservations) {
+      const resMins = timeToMinutes(res.timeSlot);
+      if (Math.abs(resMins - targetMins) < BOOKING_DURATION_MINS) {
+        const resTableIds = res.tableId.split(",");
+        if (resTableIds.includes(tId)) {
+          overlappingRes.push(res);
+        }
+      }
+    }
+    
+    if (overlappingRes.length > 0) {
+      if (tableInfo.type === "seat") {
+        // Bar counter seats are shareable. Check capacity.
+        const currentOccupiedSeats = overlappingRes.reduce((sum, r) => sum + r.partySize, 0);
+        if (currentOccupiedSeats + partySize > tableInfo.maxPax) {
+          return overlappingRes[0]; // Conflict: Exceeds max seats!
+        }
+      } else {
+        // Private tables cannot be shared. Any overlap is a conflict.
+        return overlappingRes[0];
       }
     }
   }
@@ -581,7 +600,7 @@ function handleManualSubmit(e) {
     hasConflict: false
   };
   
-  const conflictBooking = checkConflict(tableId, date, timeSlot);
+  const conflictBooking = checkConflict(tableId, date, timeSlot, null, partySize);
   if (conflictBooking) {
     triggerConflictModal(bookingObj, conflictBooking);
   } else {
@@ -947,7 +966,7 @@ function autoAllocateTable(partySize, date, timeSlot) {
   }
   
   for (const t of eligibleTables) {
-    const overlap = checkConflict(t.id, date, timeSlot);
+    const overlap = checkConflict(t.id, date, timeSlot, null, partySize);
     if (!overlap) {
       return { id: t.id, display: formatTableDisplay(t.id), isConflicted: false };
     }
@@ -974,6 +993,7 @@ function updateTableDropdownAvailability() {
   const time = manualTimeSelect.value;
   if (!date || !time) return;
   
+  const partySize = parseInt(manualPaxSelect.value, 10) || 2;
   const options = manualTableSelect.options;
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
@@ -981,7 +1001,7 @@ function updateTableDropdownAvailability() {
     const tableInfo = TABLES.find(t => t.id === tableId);
     if (!tableInfo) continue;
     
-    const overlap = checkConflict(tableId, date, time);
+    const overlap = checkConflict(tableId, date, time, null, partySize);
     if (overlap) {
       opt.disabled = true;
       if (!opt.text.endsWith(" (Occupied)")) {
@@ -1104,7 +1124,7 @@ window.triggerEmailReview = function(refCode) {
   const log = processedEmails.find(e => e.id === refCode);
   if (!log) return;
   
-  const conflict = checkConflict(log.booking.tableId, log.booking.date, log.booking.timeSlot);
+  const conflict = checkConflict(log.booking.tableId, log.booking.date, log.booking.timeSlot, null, log.booking.partySize);
   
   triggerConflictModal(log.booking, conflict || { guestName: "Requested Out-Of-Bounds Time Slot", timeSlot: log.booking.timeSlot, id: "N/A", tableId: log.booking.tableId });
   
@@ -1176,8 +1196,11 @@ function isTableOccupiedAtTime(tableId, date, targetTime24) {
     r => r.date === date && r.status !== "Cancelled"
   );
   const targetMins = timeToMinutes(targetTime24);
+  const tableInfo = TABLES.find(t => t.id === tableId);
+  if (!tableInfo) return null;
   
   // Check active bookings first
+  const activeRes = [];
   for (const res of reservations) {
     const resStartMins = timeToMinutes(res.timeSlot);
     const resEndMins = resStartMins + BOOKING_DURATION_MINS;
@@ -1185,21 +1208,46 @@ function isTableOccupiedAtTime(tableId, date, targetTime24) {
     if (targetMins >= resStartMins && targetMins < resEndMins) {
       const resTableIds = res.tableId.split(",");
       if (resTableIds.includes(tableId)) {
-        return { ...res, isUpcoming: false };
+        activeRes.push(res);
       }
     }
   }
   
+  if (activeRes.length > 0) {
+    const totalCovers = activeRes.reduce((sum, r) => sum + r.partySize, 0);
+    const isFullyOccupied = (tableInfo.type !== "seat") || (totalCovers >= tableInfo.maxPax);
+    return { 
+      ...activeRes[0], 
+      allBookings: activeRes, 
+      totalCovers: totalCovers, 
+      isFullyOccupied: isFullyOccupied, 
+      isUpcoming: false 
+    };
+  }
+  
   // Check upcoming bookings starting within 1h 45m (105 minutes) next
+  const upcomingRes = [];
   for (const res of reservations) {
     const resStartMins = timeToMinutes(res.timeSlot);
     
     if (resStartMins >= targetMins && resStartMins < targetMins + 105) {
       const resTableIds = res.tableId.split(",");
       if (resTableIds.includes(tableId)) {
-        return { ...res, isUpcoming: true };
+        upcomingRes.push(res);
       }
     }
+  }
+  
+  if (upcomingRes.length > 0) {
+    const totalCovers = upcomingRes.reduce((sum, r) => sum + r.partySize, 0);
+    const isFullyOccupied = (tableInfo.type !== "seat") || (totalCovers >= tableInfo.maxPax);
+    return { 
+      ...upcomingRes[0], 
+      allBookings: upcomingRes, 
+      totalCovers: totalCovers, 
+      isFullyOccupied: isFullyOccupied, 
+      isUpcoming: true 
+    };
   }
   
   return null;
@@ -1217,13 +1265,17 @@ function updateFloorPlanVisualState() {
     const activeBooking = isTableOccupiedAtTime(tableId, viewDate, targetTimeStr);
     
     // Clear all state classes
-    node.classList.remove("free", "occupied", "upcoming");
+    node.classList.remove("free", "occupied", "upcoming", "partially-occupied");
     
     if (activeBooking) {
       if (activeBooking.isUpcoming) {
         node.classList.add("upcoming");
       } else {
-        node.classList.add("occupied");
+        if (activeBooking.isFullyOccupied === false) {
+          node.classList.add("partially-occupied");
+        } else {
+          node.classList.add("occupied");
+        }
       }
     } else {
       node.classList.add("free");
@@ -1261,50 +1313,44 @@ function showTableInspectionDetails(tableId) {
   });
   
   if (activeBooking) {
-    const timeDetails = getSeatingTimeDetails(activeBooking);
-    const start12 = format12Hour(activeBooking.timeSlot);
-    const end12 = format12Hour(timeDetails.endTime);
-    const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
+    const all = activeBooking.allBookings || [activeBooking];
+    const statusText = activeBooking.isUpcoming ? "RESERVED SOON" : "OCCUPIED";
+    const statusColor = activeBooking.isUpcoming ? "var(--color-accent)" : "var(--color-primary-light)";
+    const badgeBg = activeBooking.isUpcoming ? "rgba(242, 187, 5, 0.2)" : (activeBooking.isFullyOccupied === false ? "rgba(52, 152, 219, 0.2)" : "rgba(193, 18, 31, 0.2)");
+    const badgeText = activeBooking.isUpcoming ? "Upcoming" : (activeBooking.isFullyOccupied === false ? "Sharing" : "Sitting");
+    const badgeColor = activeBooking.isUpcoming ? "var(--color-accent)" : (activeBooking.isFullyOccupied === false ? "#3498db" : "#e74c3c");
+    const badgeBorder = activeBooking.isUpcoming ? "rgba(242, 187, 5, 0.4)" : (activeBooking.isFullyOccupied === false ? "rgba(52, 152, 219, 0.4)" : "rgba(193, 18, 31, 0.4)");
     
-    if (activeBooking.isUpcoming) {
-      const targetMins = timeToMinutes(targetTimeStr);
-      const startMins = timeToMinutes(activeBooking.timeSlot);
-      const diffMins = startMins - targetMins;
+    const coversStr = `${activeBooking.totalCovers || activeBooking.partySize}/${tableInfo.maxPax} seats`;
+    
+    let html = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.3rem;">
+        <strong style="color: ${statusColor}; font-size: 0.95rem;">${tableInfo.name} - ${statusText}</strong>
+        <span style="font-size: 0.75rem; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">${badgeText} (${coversStr})</span>
+      </div>
+    `;
+    
+    all.forEach((bk, idx) => {
+      const timeDetails = getSeatingTimeDetails(bk);
+      const start12 = format12Hour(bk.timeSlot);
+      const end12 = format12Hour(timeDetails.endTime);
+      const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
       
-      infoPanel.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
-          <strong style="color: var(--color-accent); font-size: 0.95rem;">${tableInfo.name} - RESERVED SOON</strong>
-          <span style="font-size: 0.75rem; background: rgba(242, 187, 5, 0.2); color: var(--color-accent); border: 1px solid rgba(242, 187, 5, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Starts in ${diffMins} min</span>
+      html += `
+        <div style="margin-bottom: 0.4rem; padding-bottom: 0.4rem; ${idx < all.length - 1 ? 'border-bottom: 1px dashed rgba(255,255,255,0.04);' : ''}">
+          <div style="display: flex; justify-content: space-between;">
+            <div>Guest: <strong style="color: var(--color-text-light);">${bk.guestName}</strong> (${bk.partySize} pax)</div>
+            <div style="font-size: 0.75rem; color: var(--color-accent); font-weight: 600;">Last Order: ${lastOrder12}</div>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.1rem;">
+            Time: <strong>${start12} - ${end12}</strong> | Phone: ${bk.guestPhone}
+          </div>
+          ${bk.specialRequests ? `<div style="font-size: 0.75rem; color: var(--color-accent); font-style: italic; margin-top: 0.1rem;">💬 "${bk.specialRequests}"</div>` : ""}
         </div>
-        <div style="margin-bottom: 0.2rem;">
-          Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
-        </div>
-        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Time: <strong>${start12} - ${end12}</strong> | Last Order: <strong style="color: var(--color-accent);">${lastOrder12}</strong>
-        </div>
-        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Phone: ${activeBooking.guestPhone}
-        </div>
-        ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
       `;
-    } else {
-      infoPanel.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
-          <strong style="color: var(--color-primary-light); font-size: 0.95rem;">${tableInfo.name} - OCCUPIED</strong>
-          <span style="font-size: 0.75rem; background: rgba(193, 18, 31, 0.2); color: #e74c3c; border: 1px solid rgba(193, 18, 31, 0.4); padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: bold;">Sitting</span>
-        </div>
-        <div style="margin-bottom: 0.2rem;">
-          Guest: <strong style="color: var(--color-text-light);">${activeBooking.guestName}</strong> (${activeBooking.partySize} pax)
-        </div>
-        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Time: <strong>${start12} - ${end12}</strong> | Last Order: <strong style="color: var(--color-accent);">${lastOrder12}</strong>
-        </div>
-        <div style="margin-bottom: 0.2rem; font-size: 0.8rem; color: var(--color-text-muted);">
-          Phone: ${activeBooking.guestPhone}
-        </div>
-        ${activeBooking.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.2rem;">💬 "${activeBooking.specialRequests}"</div>` : ""}
-      `;
-    }
+    });
+    
+    infoPanel.innerHTML = html;
   } else {
     infoPanel.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
@@ -1394,17 +1440,33 @@ function runSeatingOptimizer(selectedDate) {
   let conflictCount = 0;
   const changesLog = [];
   
-  const checkConflictInAssigned = (tableId, date, timeSlot) => {
+  const checkConflictInAssigned = (tableId, date, timeSlot, bookingPartySize) => {
     const targetMins = timeToMinutes(timeSlot);
     const targetTableIds = tableId.split(",");
     
-    for (const res of assignedList) {
-      const resMins = timeToMinutes(res.timeSlot);
-      if (Math.abs(resMins - targetMins) < BOOKING_DURATION_MINS) {
-        const resTableIds = res.tableId.split(",");
-        const hasTableOverlap = resTableIds.some(id => targetTableIds.includes(id));
-        if (hasTableOverlap) {
-          return res;
+    for (const tId of targetTableIds) {
+      const tableInfo = TABLES.find(t => t.id === tId);
+      if (!tableInfo) continue;
+      
+      const overlappingRes = [];
+      for (const res of assignedList) {
+        const resMins = timeToMinutes(res.timeSlot);
+        if (Math.abs(resMins - targetMins) < BOOKING_DURATION_MINS) {
+          const resTableIds = res.tableId.split(",");
+          if (resTableIds.includes(tId)) {
+            overlappingRes.push(res);
+          }
+        }
+      }
+      
+      if (overlappingRes.length > 0) {
+        if (tableInfo.type === "seat") {
+          const currentOccupiedSeats = overlappingRes.reduce((sum, r) => sum + r.partySize, 0);
+          if (currentOccupiedSeats + bookingPartySize > tableInfo.maxPax) {
+            return overlappingRes[0];
+          }
+        } else {
+          return overlappingRes[0];
         }
       }
     }
@@ -1427,7 +1489,7 @@ function runSeatingOptimizer(selectedDate) {
     let assignedTableId = null;
     
     for (const t of eligibleTables) {
-      const overlap = checkConflictInAssigned(t.id, selectedDate, booking.timeSlot);
+      const overlap = checkConflictInAssigned(t.id, selectedDate, booking.timeSlot, booking.partySize);
       if (!overlap) {
         assignedTableId = t.id;
         booking.hasConflict = false;
@@ -1533,10 +1595,10 @@ function seedTomorrowReservations() {
       date: tomorrowStr,
       timeSlot: "18:00",
       partySize: 2,
-      tableId: "75",
+      tableId: "73",
       specialRequests: "Regular guest.",
       status: "Confirmed",
-      hasConflict: true
+      hasConflict: false
     },
     {
       id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1545,10 +1607,10 @@ function seedTomorrowReservations() {
       date: tomorrowStr,
       timeSlot: "19:00",
       partySize: 2,
-      tableId: "75",
+      tableId: "77",
       specialRequests: "Birthday celebration.",
       status: "Confirmed",
-      hasConflict: true
+      hasConflict: false
     },
     {
       id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1569,7 +1631,7 @@ function seedTomorrowReservations() {
       date: tomorrowStr,
       timeSlot: "18:00",
       partySize: 4,
-      tableId: "4",
+      tableId: "5",
       specialRequests: "High chair needed.",
       status: "Confirmed",
       hasConflict: false
@@ -1581,7 +1643,7 @@ function seedTomorrowReservations() {
       date: tomorrowStr,
       timeSlot: "19:15",
       partySize: 2,
-      tableId: "73",
+      tableId: "71",
       specialRequests: "Near the grill.",
       status: "Confirmed",
       hasConflict: false
@@ -1596,7 +1658,7 @@ function seedTomorrowReservations() {
       tableId: "4",
       specialRequests: "Window seat preferred.",
       status: "Confirmed",
-      hasConflict: true
+      hasConflict: false
     },
     {
       id: `KAZU-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1629,7 +1691,7 @@ function seedTomorrowReservations() {
       date: tomorrowStr,
       timeSlot: "20:30",
       partySize: 2,
-      tableId: "87",
+      tableId: "85",
       specialRequests: "Late night yakitori.",
       status: "Confirmed",
       hasConflict: false

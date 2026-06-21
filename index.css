@@ -794,6 +794,22 @@ select.input-control {
   filter: drop-shadow(0px 0px 8px var(--color-accent));
 }
 
+.table-node.partially-occupied rect, 
+.table-node.partially-occupied circle, 
+.table-node.partially-occupied path {
+  fill: rgba(52, 152, 219, 0.15) !important;
+  stroke: #3498db !important;
+  stroke-width: 1.5;
+  stroke-dasharray: 4,4;
+}
+
+.table-node.partially-occupied:hover rect, 
+.table-node.partially-occupied:hover circle, 
+.table-node.partially-occupied:hover path {
+  fill: rgba(52, 152, 219, 0.35) !important;
+  filter: drop-shadow(0px 0px 8px #3498db);
+}
+
 .table-node.inspected rect, 
 .table-node.inspected circle, 
 .table-node.inspected path {
