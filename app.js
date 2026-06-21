@@ -1,7 +1,7 @@
 /* C:\Users\callu\Documents\antigravity\focused-shannon\app.js */
 
-// Global Constant Table Definitions (Bar Counter seats organized in twos: 71, 73, 75...)
-const TABLES = [
+// Global Table Definitions (mutable to allow live capacity configurator)
+let TABLES = [
   { id: "1", type: "table", minPax: 5, maxPax: 8, name: "Table 1 (Big Group Table)", section: "Dining Room" },
   { id: "4", type: "table", minPax: 3, maxPax: 4, name: "Table 4 (Dining Table)", section: "Dining Room" },
   { id: "5", type: "table", minPax: 3, maxPax: 4, name: "Table 5 (Dining Table)", section: "Dining Room" },
@@ -87,7 +87,14 @@ let processedEmails = [];
 let systemSettings = {
   email: "bookings@kazu.co.nz",
   openTime: "17:00",
-  closeTime: "22:00"
+  closeTime: "22:00",
+  firebaseEnabled: false,
+  firebaseConfig: {
+    apiKey: "",
+    projectId: "",
+    appId: "",
+    authDomain: ""
+  }
 };
 
 // Temporary variables for conflict bypass
@@ -207,6 +214,90 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("optimizer-modal-backdrop").classList.remove("active");
     });
   }
+  
+  // ==========================================
+  // NEW FEATURE BINDINGS
+  // ==========================================
+  
+  // Left Column Tab Switcher
+  const btnTabBooking = document.getElementById("btn-tab-booking");
+  const btnTabWaitlist = document.getElementById("btn-tab-waitlist");
+  const bookingTabContent = document.getElementById("booking-tab-content");
+  const waitlistTabContent = document.getElementById("waitlist-tab-content");
+  
+  if (btnTabBooking && btnTabWaitlist) {
+    btnTabBooking.addEventListener("click", () => {
+      btnTabBooking.classList.add("active");
+      btnTabWaitlist.classList.remove("active");
+      bookingTabContent.style.display = "block";
+      waitlistTabContent.style.display = "none";
+    });
+    
+    btnTabWaitlist.addEventListener("click", () => {
+      btnTabWaitlist.classList.add("active");
+      btnTabBooking.classList.remove("active");
+      bookingTabContent.style.display = "none";
+      waitlistTabContent.style.display = "block";
+      renderWaitlistQueue();
+    });
+  }
+  
+  // Waitlist Form submit
+  const waitlistForm = document.getElementById("waitlist-form");
+  if (waitlistForm) {
+    waitlistForm.addEventListener("submit", handleWaitlistSubmit);
+  }
+  
+  // Firebase toggle container helper
+  const fbEnableCheckbox = document.getElementById("settings-firebase-enable");
+  if (fbEnableCheckbox) {
+    fbEnableCheckbox.addEventListener("change", () => {
+      document.getElementById("firebase-fields-container").style.display = fbEnableCheckbox.checked ? "flex" : "none";
+    });
+  }
+  
+  // Table Configuration Modal Trigger
+  const btnOpenTableConfig = document.getElementById("btn-open-table-config");
+  const btnCloseTableConfig = document.getElementById("btn-close-table-config");
+  const btnSaveTableConfig = document.getElementById("btn-save-table-config");
+  const btnResetTableConfig = document.getElementById("btn-reset-table-config");
+  const tableConfigModal = document.getElementById("table-config-modal-backdrop");
+  
+  if (btnOpenTableConfig) {
+    btnOpenTableConfig.addEventListener("click", () => {
+      closeSettingsDrawer();
+      renderTableConfigTable();
+      tableConfigModal.classList.add("active");
+    });
+  }
+  if (btnCloseTableConfig) {
+    btnCloseTableConfig.addEventListener("click", () => {
+      tableConfigModal.classList.remove("active");
+    });
+  }
+  if (btnSaveTableConfig) {
+    btnSaveTableConfig.addEventListener("click", saveTableConfig);
+  }
+  if (btnResetTableConfig) {
+    btnResetTableConfig.addEventListener("click", resetTableConfig);
+  }
+  
+  // Analytics Dashboard Modal Trigger
+  const btnViewAnalytics = document.getElementById("btn-view-analytics");
+  const btnCloseAnalytics = document.getElementById("btn-close-analytics");
+  const analyticsModal = document.getElementById("analytics-modal-backdrop");
+  
+  if (btnViewAnalytics) {
+    btnViewAnalytics.addEventListener("click", () => {
+      generateAnalyticsReport();
+      analyticsModal.classList.add("active");
+    });
+  }
+  if (btnCloseAnalytics) {
+    btnCloseAnalytics.addEventListener("click", () => {
+      analyticsModal.classList.remove("active");
+    });
+  }
 });
 
 // Time conversion utilities
@@ -255,6 +346,29 @@ function loadSettings() {
   }
   
   document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
+  
+  // Try initializing Firebase on load if enabled
+  if (systemSettings.firebaseEnabled && systemSettings.firebaseConfig && systemSettings.firebaseConfig.projectId) {
+    initFirebaseSync();
+  }
+  
+  // Load table configuration overrides
+  loadTablesConfig();
+}
+
+function populateSettingsUI() {
+  document.getElementById("settings-email").value = systemSettings.email || "";
+  document.getElementById("settings-open-time").value = systemSettings.openTime || "17:00";
+  
+  const fbEnable = !!systemSettings.firebaseEnabled;
+  document.getElementById("settings-firebase-enable").checked = fbEnable;
+  document.getElementById("firebase-fields-container").style.display = fbEnable ? "flex" : "none";
+  
+  const config = systemSettings.firebaseConfig || {};
+  document.getElementById("settings-firebase-apiKey").value = config.apiKey || "";
+  document.getElementById("settings-firebase-projectId").value = config.projectId || "";
+  document.getElementById("settings-firebase-appId").value = config.appId || "";
+  document.getElementById("settings-firebase-authDomain").value = config.authDomain || "";
 }
 
 // Save system configurations
@@ -264,13 +378,29 @@ function saveSettings(e) {
   systemSettings.email = document.getElementById("settings-email").value.trim() || "bookings@kazu.co.nz";
   systemSettings.openTime = document.getElementById("settings-open-time").value;
   
+  const fbEnable = document.getElementById("settings-firebase-enable").checked;
+  systemSettings.firebaseEnabled = fbEnable;
+  
+  systemSettings.firebaseConfig = {
+    apiKey: document.getElementById("settings-firebase-apiKey").value.trim(),
+    projectId: document.getElementById("settings-firebase-projectId").value.trim(),
+    appId: document.getElementById("settings-firebase-appId").value.trim(),
+    authDomain: document.getElementById("settings-firebase-authDomain").value.trim()
+  };
+  
   localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
   
   document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
   closeSettingsDrawer();
   
   initFormTimeDropdowns();
-  alert("Settings saved successfully!");
+  
+  if (fbEnable && systemSettings.firebaseConfig.projectId) {
+    initFirebaseSync();
+  } else {
+    alert("Settings saved successfully!");
+  }
+  
   renderBookingsList();
   initSnapshotTimeDropdown();
   updateFloorPlanVisualState();
@@ -281,14 +411,20 @@ function resetSettings() {
     systemSettings = {
       email: "bookings@kazu.co.nz",
       openTime: "17:00",
-      closeTime: "22:00"
+      closeTime: "22:00",
+      firebaseEnabled: false,
+      firebaseConfig: {
+        apiKey: "",
+        projectId: "",
+        appId: "",
+        authDomain: ""
+      }
     };
     localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
     
-    document.getElementById("settings-email").value = systemSettings.email;
-    document.getElementById("settings-open-time").value = systemSettings.openTime;
-    
+    populateSettingsUI();
     document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
+    
     initFormTimeDropdowns();
     renderBookingsList();
     initSnapshotTimeDropdown();
@@ -364,7 +500,10 @@ function initTableAssignmentDropdowns() {
 }
 
 // Open/Close Settings
-function openSettingsDrawer() { settingsDrawer.classList.add("active"); }
+function openSettingsDrawer() { 
+  populateSettingsUI();
+  settingsDrawer.classList.add("active"); 
+}
 function closeSettingsDrawer() { settingsDrawer.classList.remove("active"); }
 
 // Get reservations from local storage
@@ -457,6 +596,13 @@ function saveBookingDirectly(booking) {
   saveAllReservations(current);
   
   alert(`Reservation saved successfully for ${booking.guestName} (Ref: ${booking.id})`);
+  
+  // If this booking came from a waitlist entry, mark it as Seated
+  if (activeSeatingWaitlistId) {
+    markWaitlistAsSeated(activeSeatingWaitlistId);
+    activeSeatingWaitlistId = null;
+  }
+  
   resetManualForm();
   renderBookingsList();
   updateFloorPlanVisualState();
@@ -488,6 +634,9 @@ function triggerConflictModal(newBooking, existingBooking) {
   conflictModalBackdrop.classList.add("active");
 }
 
+// Global active waitlist seating session tracker
+let activeSeatingWaitlistId = null;
+
 function cancelConflictBypass() {
   pendingOverrideBooking = null;
   conflictModalBackdrop.classList.remove("active");
@@ -501,6 +650,13 @@ function confirmConflictBypass() {
     saveAllReservations(current);
     
     alert(`Reservation overridden & saved (Ref: ${pendingOverrideBooking.id})`);
+    
+    // If this booking came from a waitlist entry, mark it as Seated
+    if (activeSeatingWaitlistId) {
+      markWaitlistAsSeated(activeSeatingWaitlistId);
+      activeSeatingWaitlistId = null;
+    }
+    
     pendingOverrideBooking = null;
     
     conflictModalBackdrop.classList.remove("active");
@@ -1167,6 +1323,26 @@ function initFloorPlanView() {
 }
 
 function getTablePriorityOrder(partySize) {
+  // Filter tables that can accommodate this party size
+  const eligible = TABLES.filter(t => partySize >= t.minPax && partySize <= t.maxPax);
+  
+  // Sort by priority rank (t.priority - if defined, else default values)
+  eligible.sort((a, b) => {
+    const pA = a.priority !== undefined ? a.priority : getDefaultTablePriority(a.id, partySize);
+    const pB = b.priority !== undefined ? b.priority : getDefaultTablePriority(b.id, partySize);
+    return pA - pB;
+  });
+  
+  return eligible.map(t => t.id);
+}
+
+function getDefaultTablePriority(tableId, partySize) {
+  const originalOrder = getOriginalPriorityList(partySize);
+  const idx = originalOrder.indexOf(tableId);
+  return idx !== -1 ? idx + 1 : 999;
+}
+
+function getOriginalPriorityList(partySize) {
   if (partySize === 2) {
     return ["75", "73", "77", "71", "79", "81", "83", "87", "85", "95", "96"];
   }
@@ -1490,4 +1666,518 @@ function initDateDropdowns() {
     manualDateSelect.add(new Option(display, dateStr));
     viewDateSelect.add(new Option(display, dateStr));
   }
+}
+
+// ==========================================
+// ADVANCED STAFF CONSOLE COMPONENT LOGIC
+// ==========================================
+
+// Load custom table configurations
+function loadTablesConfig() {
+  const saved = localStorage.getItem("kazu_tables_config");
+  if (saved) {
+    const overrides = JSON.parse(saved);
+    TABLES.forEach(t => {
+      const match = overrides.find(o => o.id === t.id);
+      if (match) {
+        t.minPax = parseInt(match.minPax, 10);
+        t.maxPax = parseInt(match.maxPax, 10);
+        t.priority = parseInt(match.priority, 10);
+        if (match.name) t.name = match.name;
+      }
+    });
+  }
+}
+
+// Render Table configurator grid
+function renderTableConfigTable() {
+  const tbody = document.getElementById("table-config-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  
+  TABLES.forEach(t => {
+    // Determine current priority value (fallback if undefined)
+    const currentPriority = t.priority !== undefined ? t.priority : getDefaultTablePriority(t.id, t.maxPax);
+    
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="font-weight: 600;">${t.name} (ID: ${t.id})</td>
+      <td style="color: var(--color-text-muted);">${t.section}</td>
+      <td>
+        <input type="number" class="config-input" data-table-id="${t.id}" data-field="minPax" value="${t.minPax}" min="1" max="10">
+      </td>
+      <td>
+        <input type="number" class="config-input" data-table-id="${t.id}" data-field="maxPax" value="${t.maxPax}" min="1" max="10">
+      </td>
+      <td>
+        <input type="number" class="config-input" data-table-id="${t.id}" data-field="priority" value="${currentPriority}" min="1" max="999">
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Save Table Configurations
+function saveTableConfig() {
+  const tbody = document.getElementById("table-config-tbody");
+  const inputs = tbody.querySelectorAll(".config-input");
+  const overrides = [];
+  
+  // Build overrides map
+  const tableMap = {};
+  inputs.forEach(input => {
+    const tableId = input.getAttribute("data-table-id");
+    const field = input.getAttribute("data-field");
+    const val = parseInt(input.value, 10);
+    
+    if (!tableMap[tableId]) tableMap[tableId] = { id: tableId };
+    tableMap[tableId][field] = val;
+  });
+  
+  // Save map values to array
+  for (const info of Object.values(tableMap)) {
+    overrides.push(info);
+    
+    // Apply in-memory immediately
+    const t = TABLES.find(tbl => tbl.id === info.id);
+    if (t) {
+      t.minPax = info.minPax;
+      t.maxPax = info.maxPax;
+      t.priority = info.priority;
+    }
+  }
+  
+  localStorage.setItem("kazu_tables_config", JSON.stringify(overrides));
+  
+  // Sync to Firestore if active
+  if (firebaseInitialized && db) {
+    db.collection("settings").doc("tables").set({ data: overrides })
+      .catch(err => console.error("Error syncing tables to Firestore: ", err));
+  }
+  
+  initTableAssignmentDropdowns();
+  updateTableDropdownAvailability();
+  suggestBestTable();
+  
+  document.getElementById("table-config-modal-backdrop").classList.remove("active");
+  alert("Table configurations and capacity rules saved successfully!");
+}
+
+// Reset Table Config to Default
+function resetTableConfig() {
+  if (confirm("Reset all table capacities and priority settings to factory defaults?")) {
+    localStorage.removeItem("kazu_tables_config");
+    location.reload();
+  }
+}
+
+// Waitlist database functions
+function getWaitlist() {
+  const data = localStorage.getItem("kazu_waitlist_data");
+  return data ? JSON.parse(data) : [];
+}
+
+function saveWaitlist(list) {
+  localStorage.setItem("kazu_waitlist_data", JSON.stringify(list));
+  
+  if (firebaseInitialized && db) {
+    list.forEach(item => {
+      const { id, ...body } = item;
+      db.collection("waitlist").doc(item.id).set(body)
+        .catch(err => console.error("Error syncing waitlist doc: ", err));
+    });
+  }
+}
+
+// Handle Waitlist form submit
+function handleWaitlistSubmit(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById("wait-name").value.trim();
+  const phone = document.getElementById("wait-phone").value.trim();
+  const partySize = parseInt(document.getElementById("wait-pax").value, 10);
+  const estWait = document.getElementById("wait-est").value;
+  const notes = document.getElementById("wait-notes").value.trim();
+  
+  const now = new Date();
+  const checkInTime = now.toLocaleTimeString("en-NZ", { hour: '2-digit', minute: '2-digit' });
+  
+  const entry = {
+    id: `WAIT-${Math.floor(1000 + Math.random() * 9000)}`,
+    guestName: name,
+    guestPhone: phone,
+    partySize: partySize,
+    estWait: estWait,
+    specialRequests: notes,
+    checkInTime: checkInTime,
+    timestamp: now.getTime(),
+    status: "Waiting"
+  };
+  
+  const list = getWaitlist();
+  list.push(entry);
+  saveWaitlist(list);
+  
+  // Clear form
+  document.getElementById("wait-name").value = "";
+  document.getElementById("wait-phone").value = "";
+  document.getElementById("wait-notes").value = "";
+  document.getElementById("wait-pax").value = "2";
+  document.getElementById("wait-est").value = "30 mins";
+  
+  renderWaitlistQueue();
+}
+
+// Render waitlist cards
+function renderWaitlistQueue() {
+  const container = document.getElementById("waitlist-queue-container");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  const list = getWaitlist().filter(item => item.status === "Waiting")
+                           .sort((a, b) => a.timestamp - b.timestamp);
+                           
+  if (list.length === 0) {
+    container.innerHTML = `<p style="font-style: italic; color: var(--color-text-muted); font-size: 0.85rem; text-align: center; margin-top: 1rem;">Waitlist queue is empty.</p>`;
+    return;
+  }
+  
+  list.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "waitlist-item";
+    div.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.3rem;">
+        <div style="font-weight: bold; color: var(--color-text-light);">${item.guestName} (${item.partySize} pax)</div>
+        <span style="font-size: 0.75rem; color: var(--color-accent); font-weight: 500;">Est: ${item.estWait}</span>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--color-text-muted);">Phone: ${item.guestPhone} | Checked in: ${item.checkInTime}</div>
+      ${item.specialRequests ? `<div style="font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; margin-top: 0.2rem;">💬 "${item.specialRequests}"</div>` : ""}
+      <div style="display: flex; gap: 0.4rem; justify-content: flex-end; margin-top: 0.5rem;">
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" onclick="seatWaitlist('${item.id}')">🪑 Seat</button>
+        <button class="btn btn-danger" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; background: rgba(231,76,60,0.2); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c;" onclick="cancelWaitlist('${item.id}')">✖ Cancel</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// Seat waitlist item (pre-fills phone booking form)
+window.seatWaitlist = function(id) {
+  const list = getWaitlist();
+  const item = list.find(w => w.id === id);
+  if (!item) return;
+  
+  activeSeatingWaitlistId = id;
+  
+  // Switch to booking form tab
+  document.getElementById("btn-tab-booking").click();
+  
+  // Pre-fill fields
+  manualNameInput.value = item.guestName;
+  manualPhoneInput.value = item.guestPhone;
+  manualPaxSelect.value = item.partySize;
+  manualNotesInput.value = item.specialRequests ? `[Waitlist] ${item.specialRequests}` : "[Waitlist]";
+  
+  // Re-eval suggested seats
+  updateTableDropdownAvailability();
+  suggestBestTable();
+  
+  alert(`Pre-filled booking form for ${item.guestName} (${item.partySize} pax). Please select a table to finalize seating!`);
+};
+
+// Cancel waitlist item
+window.cancelWaitlist = function(id) {
+  const list = getWaitlist();
+  const item = list.find(w => w.id === id);
+  if (item) {
+    item.status = "Cancelled";
+    saveWaitlist(list);
+    renderWaitlistQueue();
+    
+    // Explicit sync update to Firestore
+    if (firebaseInitialized && db) {
+      db.collection("waitlist").doc(id).update({ status: "Cancelled" })
+        .catch(err => console.error("Error updating waitlist status: ", err));
+    }
+  }
+};
+
+// Helper: mark waitlist as seated in database
+function markWaitlistAsSeated(id) {
+  const list = getWaitlist();
+  const item = list.find(w => w.id === id);
+  if (item) {
+    item.status = "Seated";
+    saveWaitlist(list);
+    renderWaitlistQueue();
+    
+    // Explicit sync update to Firestore
+    if (firebaseInitialized && db) {
+      db.collection("waitlist").doc(id).update({ status: "Seated" })
+        .catch(err => console.error("Error updating waitlist status: ", err));
+    }
+  }
+}
+
+// Service Analytics logic
+function generateAnalyticsReport() {
+  const viewDate = document.getElementById("view-date").value;
+  const activeBookings = getReservations().filter(r => r.date === viewDate && r.status !== "Cancelled");
+  
+  // 1. Calculate Averages
+  const totalCovers = activeBookings.reduce((sum, r) => sum + r.partySize, 0);
+  const avgCovers = activeBookings.length > 0 ? (totalCovers / activeBookings.length).toFixed(1) : "0.0";
+  document.getElementById("anal-avg-covers").textContent = avgCovers;
+  
+  // 2. Identify busiest time slot and top dining section
+  const slotCovers = {};
+  const sectionCovers = {};
+  
+  // Define operational 30m slots: 17:00 to 22:00
+  const timeSlots = [];
+  for (let h = 17; h <= 22; h++) {
+    timeSlots.push(`${h}:00`, `${h}:30`);
+  }
+  
+  timeSlots.forEach(slot => {
+    slotCovers[slot] = 0;
+  });
+  
+  activeBookings.forEach(res => {
+    const resMins = timeToMinutes(res.timeSlot);
+    
+    // Find section from TABLES definition
+    const tableIds = res.tableId.split(",");
+    tableIds.forEach(tId => {
+      const info = TABLES.find(t => t.id === tId);
+      if (info) {
+        const sec = info.section;
+        sectionCovers[sec] = (sectionCovers[sec] || 0) + res.partySize;
+      }
+    });
+    
+    // Accumulate slot load (assuming 2 hour duration)
+    timeSlots.forEach(slot => {
+      const slotMins = timeToMinutes(slot);
+      if (slotMins >= resMins && slotMins < resMins + 120) {
+        slotCovers[slot] += res.partySize;
+      }
+    });
+  });
+  
+  // Find Peak Slot
+  let peakTime = "N/A";
+  let maxCovers = 0;
+  for (const [slot, covers] of Object.entries(slotCovers)) {
+    if (covers > maxCovers) {
+      maxCovers = covers;
+      peakTime = format12Hour(slot);
+    }
+  }
+  document.getElementById("anal-peak-time").textContent = maxCovers > 0 ? `${peakTime} (${maxCovers} covers)` : "N/A";
+  
+  // Find Top Section
+  let topSec = "N/A";
+  let maxSecCovers = 0;
+  for (const [sec, covers] of Object.entries(sectionCovers)) {
+    if (covers > maxSecCovers) {
+      maxSecCovers = covers;
+      topSec = sec;
+    }
+  }
+  document.getElementById("anal-top-section").textContent = topSec;
+  
+  // 3. Render CSS flex bar chart
+  renderAnalyticsChart(slotCovers, maxCovers);
+  
+  // 4. Render Table Occupancy Rate Table
+  renderAnalyticsTable(activeBookings, timeSlots.length);
+}
+
+function renderAnalyticsChart(slotCovers, maxCovers) {
+  const container = document.getElementById("analytics-chart-container");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  for (const [slot, covers] of Object.entries(slotCovers)) {
+    const pct = maxCovers > 0 ? (covers / maxCovers) * 100 : 0;
+    
+    const barWrapper = document.createElement("div");
+    barWrapper.className = "chart-bar-wrapper";
+    barWrapper.innerHTML = `
+      <div class="chart-tooltip">${format12Hour(slot)}: <strong>${covers} covers</strong></div>
+      <div class="chart-bar" style="height: ${pct}%;"></div>
+      <div class="chart-label">${slot}</div>
+    `;
+    container.appendChild(barWrapper);
+  }
+}
+
+function renderAnalyticsTable(activeBookings, totalSlots) {
+  const tbody = document.getElementById("analytics-occupancy-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  
+  // Calculate slot occupancy count per table
+  const tableOccupiedSlots = {};
+  TABLES.forEach(t => {
+    tableOccupiedSlots[t.id] = 0;
+  });
+  
+  activeBookings.forEach(res => {
+    const resMins = timeToMinutes(res.timeSlot);
+    const tableIds = res.tableId.split(",");
+    
+    tableIds.forEach(tId => {
+      // Loop over 30m slots during booking duration
+      for (let offset = 0; offset < 120; offset += 30) {
+        const slotMins = resMins + offset;
+        const h = Math.floor(slotMins / 60);
+        const m = slotMins % 60;
+        
+        // Ensure within restaurant hours
+        if (slotMins >= timeToMinutes(systemSettings.openTime) && slotMins <= timeToMinutes("22:00")) {
+          tableOccupiedSlots[tId] = (tableOccupiedSlots[tId] || 0) + 1;
+        }
+      }
+    });
+  });
+  
+  TABLES.forEach(t => {
+    const occupied = tableOccupiedSlots[t.id] || 0;
+    const rate = totalSlots > 0 ? Math.round((occupied / totalSlots) * 100) : 0;
+    
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="font-weight: 500;">${t.name}</td>
+      <td>${t.section}</td>
+      <td style="text-align: center;">${occupied} / ${totalSlots}</td>
+      <td>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div style="flex-grow: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-glass);">
+            <div style="width: ${rate}%; height: 100%; background: ${rate > 50 ? 'linear-gradient(90deg, #e74c3c, #c1121f)' : 'linear-gradient(90deg, #2ecc71, #27ae60)'};"></div>
+          </div>
+          <span>${rate}%</span>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Firebase Cloud Synchronization Logic
+let db = null;
+let firebaseInitialized = false;
+
+function initFirebaseSync() {
+  if (!systemSettings.firebaseEnabled || !systemSettings.firebaseConfig || !systemSettings.firebaseConfig.projectId) {
+    return;
+  }
+  
+  if (firebaseInitialized) return;
+  
+  // Dynamically load Firebase SDKs from CDN
+  const sdkScript = document.createElement("script");
+  sdkScript.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+  document.head.appendChild(sdkScript);
+  
+  sdkScript.onload = () => {
+    const firestoreScript = document.createElement("script");
+    firestoreScript.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js";
+    document.head.appendChild(firestoreScript);
+    
+    firestoreScript.onload = () => {
+      try {
+        const firebaseConfig = {
+          apiKey: systemSettings.firebaseConfig.apiKey,
+          authDomain: systemSettings.firebaseConfig.authDomain || `${systemSettings.firebaseConfig.projectId}.firebaseapp.com`,
+          projectId: systemSettings.firebaseConfig.projectId,
+          appId: systemSettings.firebaseConfig.appId
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        firebaseInitialized = true;
+        console.log("Firebase initialized successfully");
+        
+        setupFirestoreListeners();
+        alert("Firebase Cloud Sync initialized successfully!");
+      } catch (err) {
+        console.error("Firebase init failed: ", err);
+        alert("Firebase setup failed. Falling back to local offline storage.");
+      }
+    };
+  };
+}
+
+function setupFirestoreListeners() {
+  if (!db) return;
+  
+  // Listen to Reservations
+  db.collection("reservations").onSnapshot(snapshot => {
+    let localRes = getReservations();
+    snapshot.docChanges().forEach(change => {
+      const data = change.doc.data();
+      const id = change.doc.id;
+      const index = localRes.findIndex(r => r.id === id);
+      
+      if (change.type === "added" || change.type === "modified") {
+        const item = { id, ...data };
+        if (index === -1) {
+          localRes.push(item);
+        } else {
+          localRes[index] = item;
+        }
+      } else if (change.type === "removed") {
+        if (index !== -1) {
+          localRes.splice(index, 1);
+        }
+      }
+    });
+    
+    localStorage.setItem("kazu_backend_reservations", JSON.stringify(localRes));
+    renderBookingsList();
+    updateFloorPlanVisualState();
+    updateTableDropdownAvailability();
+  });
+  
+  // Listen to Settings
+  db.collection("settings").doc("system").onSnapshot(doc => {
+    if (doc.exists) {
+      const remoteSettings = doc.data();
+      systemSettings.email = remoteSettings.email || systemSettings.email;
+      systemSettings.openTime = remoteSettings.openTime || systemSettings.openTime;
+      systemSettings.closeTime = remoteSettings.closeTime || systemSettings.closeTime;
+      localStorage.setItem("kazu_system_settings", JSON.stringify(systemSettings));
+      
+      document.getElementById("active-email-display").textContent = `(Monitoring: ${systemSettings.email})`;
+      initFormTimeDropdowns();
+    }
+  });
+
+  // Listen to Waitlist
+  db.collection("waitlist").onSnapshot(snapshot => {
+    let localWait = getWaitlist();
+    snapshot.docChanges().forEach(change => {
+      const data = change.doc.data();
+      const id = change.doc.id;
+      const index = localWait.findIndex(w => w.id === id);
+      
+      if (change.type === "added" || change.type === "modified") {
+        const item = { id, ...data };
+        if (index === -1) {
+          localWait.push(item);
+        } else {
+          localWait[index] = item;
+        }
+      } else if (change.type === "removed") {
+        if (index !== -1) {
+          localWait.splice(index, 1);
+        }
+      }
+    });
+    
+    localStorage.setItem("kazu_waitlist_data", JSON.stringify(localWait));
+    renderWaitlistQueue();
+  });
 }
