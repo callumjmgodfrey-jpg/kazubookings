@@ -954,7 +954,7 @@ function autoAllocateTable(partySize, date, timeSlot) {
   
   // Apply priority seating logic for party size of 2
   if (partySize === 2) {
-    const priority = ["75", "73", "77", "71", "79", "81", "83", "87", "85", "95", "96"];
+    const priority = ["75", "73", "77", "71", "79", "81", "83", "85", "87", "95", "96"];
     eligibleTables.sort((a, b) => {
       const indexA = priority.indexOf(a.id);
       const indexB = priority.indexOf(b.id);
@@ -1397,10 +1397,10 @@ function getDefaultTablePriority(tableId, partySize) {
 
 function getOriginalPriorityList(partySize) {
   if (partySize === 2) {
-    return ["75", "73", "77", "71", "79", "81", "83", "87", "85", "95", "96"];
+    return ["75", "73", "77", "71", "79", "81", "83", "85", "87", "95", "96"];
   }
   if (partySize === 1) {
-    return ["87", "75", "73", "77", "71", "79", "81", "83", "85", "95", "96"];
+    return ["75", "73", "77", "71", "79", "81", "83", "85", "87", "95", "96"];
   }
   if (partySize >= 3 && partySize <= 4) {
     return ["4", "5", "6", "21", "22", "23", "24", "31", "32", "33", "34", "91", "92", "93", "95", "96"];
