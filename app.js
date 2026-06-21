@@ -462,8 +462,7 @@ function initFormTimeDropdowns() {
   const dateObj = new Date(manualDate);
   const dayOfWeek = dateObj.getDay();
   
-  const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-  const maxTimeStr = isWeekend ? "20:30" : "20:00";
+  const maxTimeStr = "20:00";
   
   const startMins = timeToMinutes(systemSettings.openTime);
   const endMins = timeToMinutes(maxTimeStr);
@@ -569,8 +568,7 @@ function handleManualSubmit(e) {
   
   const d = new Date(date);
   const dayOfWeek = d.getDay();
-  const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-  const maxTimeStr = isWeekend ? "20:30" : "20:00";
+  const maxTimeStr = "20:00";
   const startMins = timeToMinutes(systemSettings.openTime);
   const endMins = timeToMinutes(maxTimeStr);
   const targetMins = timeToMinutes(timeSlot);
@@ -881,8 +879,7 @@ function handleEmailSimulation() {
   
   const d = new Date(parsed.date);
   const dayOfWeek = d.getDay();
-  const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-  const maxTimeStr = isWeekend ? "20:30" : "20:00";
+  const maxTimeStr = "20:00";
   const startMins = timeToMinutes(systemSettings.openTime);
   const endMins = timeToMinutes(maxTimeStr);
   const targetMins = timeToMinutes(parsed.timeSlot);
@@ -1689,7 +1686,7 @@ function seedTomorrowReservations() {
       guestName: "Liam O'Connor",
       guestPhone: "022 555 3333",
       date: tomorrowStr,
-      timeSlot: "20:30",
+      timeSlot: "20:00",
       partySize: 2,
       tableId: "85",
       specialRequests: "Late night yakitori.",
@@ -2271,7 +2268,13 @@ function getSeatingTimeDetails(res) {
     }
   });
   
-  const lastOrderMins = Math.max(startMins, nextStartMins - 30);
+  let lastOrderMins = Math.max(startMins, nextStartMins - 30);
+  
+  // Guarantee bookings starting after 7:30 PM (19:30) have last order at 9:00 PM (21:00) and end time at 9:30 PM (21:30)
+  if (startMins > 1170) {
+    nextStartMins = Math.max(nextStartMins, 1290);
+    lastOrderMins = Math.max(lastOrderMins, 1260);
+  }
   
   const formatMins = (totalMins) => {
     const hours = Math.floor(totalMins / 60);
