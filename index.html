@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Console | Kazu Yakitori & Sake Bar</title>
   <link rel="stylesheet" href="index.css">
+  <script>
+    if (sessionStorage.getItem("kazu_logged_in") !== "true") {
+      window.location.replace("login.html");
+    }
+  </script>
 </head>
 <body>
   <div class="app-container">
@@ -559,6 +564,9 @@
           </button>
           <button type="button" class="btn btn-accent btn-block" id="btn-seed-data" style="margin-top: 1rem;">
             ⚡ Seed Bookings (Tomorrow)
+          </button>
+          <button type="button" class="btn btn-block" id="btn-logout" style="margin-top: 1.5rem; background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3);">
+            🚪 Logout Staff Session
           </button>
         </div>
       </form>

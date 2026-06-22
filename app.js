@@ -153,6 +153,16 @@ document.addEventListener("DOMContentLoaded", () => {
     btnSeedData.addEventListener("click", seedTomorrowReservations);
   }
   
+  const btnLogout = document.getElementById("btn-logout");
+  if (btnLogout) {
+    btnLogout.addEventListener("click", () => {
+      if (confirm("Are you sure you want to log out of the staff session?")) {
+        sessionStorage.removeItem("kazu_logged_in");
+        window.location.replace("login.html");
+      }
+    });
+  }
+  
   // Conflict Dialog Bindings
   btnModalCancel.addEventListener("click", cancelConflictBypass);
   btnModalOverride.addEventListener("click", confirmConflictBypass);
