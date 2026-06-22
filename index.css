@@ -981,18 +981,6 @@ select.input-control {
 }
 
 /* Guest Directory Styles */
-.badge-vip {
-  display: inline-block;
-  background: rgba(212, 175, 55, 0.15);
-  color: #ffd700;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
 
 .badge-regular {
   display: inline-block;
@@ -1068,11 +1056,7 @@ select.input-control {
   margin-top: 0.5rem;
 }
 
-#phone-match-alert.match-vip {
-  background: rgba(212, 175, 55, 0.12);
-  color: #ffd700;
-  border: 1px solid rgba(212, 175, 55, 0.25);
-}
+
 
 #phone-match-alert.match-regular {
   background: rgba(46, 204, 113, 0.12);

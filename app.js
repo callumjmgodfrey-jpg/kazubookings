@@ -327,13 +327,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let statusText = "";
         let classToAdd = "match-standard";
-        if (matched.isVIP) {
-          statusText += "★ VIP Guest ";
-          classToAdd = "match-vip";
-        }
         if (matched.isRegular) {
           statusText += "♦ Regular Guest ";
-          if (classToAdd !== "match-vip") classToAdd = "match-regular";
+          classToAdd = "match-regular";
         }
         
         let details = statusText ? `✨ <strong>${statusText}</strong>` : "✨ Guest Profile Found";
@@ -642,7 +638,6 @@ function saveAllReservations(reservations) {
           phone: r.guestPhone,
           name: r.guestName,
           email: "",
-          isVIP: false,
           isRegular: false,
           allergies: "",
           preferences: r.specialRequests || "",
@@ -905,15 +900,12 @@ function renderBookingsList() {
     const timeDetails = getSeatingTimeDetails(res);
     const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
 
-    // Fetch guest profile for VIP/Regular/Allergy badges
+    // Fetch guest profile for Regular/Allergy badges
     const directory = getGuestDirectory();
     const guestProfile = directory.find(g => normalizePhone(g.phone) === normalizePhone(res.guestPhone));
     let guestBadgesHtml = "";
     let allergiesText = "";
     if (guestProfile) {
-      if (guestProfile.isVIP) {
-        guestBadgesHtml += `<span class="badge-vip" style="margin-left: 0.4rem;">★ VIP</span>`;
-      }
       if (guestProfile.isRegular) {
         guestBadgesHtml += `<span class="badge-regular" style="margin-left: 0.4rem;">♦ Regular</span>`;
       }
@@ -1498,14 +1490,11 @@ function showTableInspectionDetails(tableId) {
       const end12 = format12Hour(timeDetails.endTime);
       const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
       
-      // Fetch guest profile for VIP/Regular/Allergy badges
+      // Fetch guest profile for Regular/Allergy badges
       const directory = getGuestDirectory();
       const guestProfile = directory.find(g => normalizePhone(g.phone) === normalizePhone(bk.guestPhone));
       let guestBadgesHtml = "";
       if (guestProfile) {
-        if (guestProfile.isVIP) {
-          guestBadgesHtml += `<span class="badge-vip" style="margin-left: 0.3rem; font-size: 0.65rem; padding: 0.05rem 0.2rem; vertical-align: middle;">★ VIP</span>`;
-        }
         if (guestProfile.isRegular) {
           guestBadgesHtml += `<span class="badge-regular" style="margin-left: 0.3rem; font-size: 0.65rem; padding: 0.05rem 0.2rem; vertical-align: middle;">♦ REG</span>`;
         }
@@ -2471,7 +2460,7 @@ function getSeatingTimeDetails(res) {
 }
 
 // ==========================================
-// GUEST DIRECTORY & VIP TAGGING ENGINE
+// GUEST DIRECTORY ENGINE
 // ==========================================
 
 function getGuestDirectory() {
@@ -2501,7 +2490,6 @@ function initializeGuestDirectoryIfEmpty() {
         phone: "027 493 2847",
         name: "Kenji Sato",
         email: "kenji.sato@example.com",
-        isVIP: true,
         isRegular: true,
         allergies: "",
         preferences: "Prefers Grill stool 75",
@@ -2512,7 +2500,6 @@ function initializeGuestDirectoryIfEmpty() {
         phone: "022 431 8765",
         name: "Yuki Matsuura",
         email: "yuki.m@example.com",
-        isVIP: false,
         isRegular: true,
         allergies: "Shellfish",
         preferences: "Prefers Grill stool 73",
@@ -2523,7 +2510,6 @@ function initializeGuestDirectoryIfEmpty() {
         phone: "021 987 6543",
         name: "Satomi Takahashi",
         email: "satomi.t@example.com",
-        isVIP: false,
         isRegular: false,
         allergies: "Gluten",
         preferences: "Quiet seating",
@@ -2534,8 +2520,7 @@ function initializeGuestDirectoryIfEmpty() {
         phone: "027 555 8888",
         name: "Alice Cooper",
         email: "alice.c@example.com",
-        isVIP: true,
-        isRegular: false,
+        isRegular: true,
         allergies: "Peanuts",
         preferences: "Window seat (Table 4)",
         visitCount: 2,
@@ -2545,7 +2530,6 @@ function initializeGuestDirectoryIfEmpty() {
         phone: "022 555 3333",
         name: "Liam O'Connor",
         email: "liam.oc@example.com",
-        isVIP: false,
         isRegular: true,
         allergies: "",
         preferences: "Sake Bar Table 85",
@@ -2575,7 +2559,6 @@ function syncBookingWithGuestDirectory(booking) {
       phone: booking.guestPhone,
       name: booking.guestName,
       email: "",
-      isVIP: false,
       isRegular: false,
       allergies: "",
       preferences: booking.specialRequests || "",
@@ -2619,8 +2602,6 @@ function renderGuestDirectory() {
   }
   
   filtered.sort((a, b) => {
-    if (a.isVIP && !b.isVIP) return -1;
-    if (!a.isVIP && b.isVIP) return 1;
     if (a.isRegular && !b.isRegular) return -1;
     if (!a.isRegular && b.isRegular) return 1;
     return a.name.localeCompare(b.name);
@@ -2631,9 +2612,6 @@ function renderGuestDirectory() {
     card.className = "guest-card";
     
     let badgesHtml = "";
-    if (guest.isVIP) {
-      badgesHtml += `<span class="badge-vip">★ VIP</span>`;
-    }
     if (guest.isRegular) {
       badgesHtml += `<span class="badge-regular">♦ Regular</span>`;
     }
@@ -2682,7 +2660,6 @@ function showGuestProfileModal(phone) {
     document.getElementById("guest-profile-name").value = guest.name;
     document.getElementById("guest-profile-phone").value = guest.phone;
     document.getElementById("guest-profile-email").value = guest.email || "";
-    document.getElementById("guest-profile-vip").checked = guest.isVIP || false;
     document.getElementById("guest-profile-regular").checked = guest.isRegular || false;
     document.getElementById("guest-profile-allergies").value = guest.allergies || "";
     document.getElementById("guest-profile-preferences").value = guest.preferences || "";
@@ -2723,7 +2700,6 @@ function handleGuestProfileSubmit(e) {
   const name = document.getElementById("guest-profile-name").value.trim();
   const phone = document.getElementById("guest-profile-phone").value.trim();
   const email = document.getElementById("guest-profile-email").value.trim();
-  const isVIP = document.getElementById("guest-profile-vip").checked;
   const isRegular = document.getElementById("guest-profile-regular").checked;
   const allergies = document.getElementById("guest-profile-allergies").value.trim();
   const preferences = document.getElementById("guest-profile-preferences").value.trim();
@@ -2746,7 +2722,6 @@ function handleGuestProfileSubmit(e) {
         name,
         phone,
         email,
-        isVIP,
         isRegular,
         allergies,
         preferences
@@ -2757,7 +2732,6 @@ function handleGuestProfileSubmit(e) {
       name,
       phone,
       email,
-      isVIP,
       isRegular,
       allergies,
       preferences,
