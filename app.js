@@ -103,6 +103,7 @@ let pendingOverrideBooking = null;
 // Initialize Page Elements
 document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
+  initializeGuestDirectoryIfEmpty();
   initFormTimeDropdowns();
   initTableAssignmentDropdowns();
   
@@ -222,23 +223,136 @@ document.addEventListener("DOMContentLoaded", () => {
   // Left Column Tab Switcher
   const btnTabBooking = document.getElementById("btn-tab-booking");
   const btnTabWaitlist = document.getElementById("btn-tab-waitlist");
+  const btnTabGuests = document.getElementById("btn-tab-guests");
   const bookingTabContent = document.getElementById("booking-tab-content");
   const waitlistTabContent = document.getElementById("waitlist-tab-content");
+  const guestsTabContent = document.getElementById("guests-tab-content");
   
-  if (btnTabBooking && btnTabWaitlist) {
+  if (btnTabBooking && btnTabWaitlist && btnTabGuests) {
+    const setTabActive = (activeTab, inactiveTabs) => {
+      activeTab.classList.add("active");
+      activeTab.style.borderBottomColor = "var(--color-accent)";
+      activeTab.style.color = "var(--color-text-light)";
+      
+      inactiveTabs.forEach(tab => {
+        tab.classList.remove("active");
+        tab.style.borderBottomColor = "transparent";
+        tab.style.color = "var(--color-text-muted)";
+      });
+    };
+
     btnTabBooking.addEventListener("click", () => {
-      btnTabBooking.classList.add("active");
-      btnTabWaitlist.classList.remove("active");
+      setTabActive(btnTabBooking, [btnTabWaitlist, btnTabGuests]);
       bookingTabContent.style.display = "block";
       waitlistTabContent.style.display = "none";
+      guestsTabContent.style.display = "none";
     });
     
     btnTabWaitlist.addEventListener("click", () => {
-      btnTabWaitlist.classList.add("active");
-      btnTabBooking.classList.remove("active");
+      setTabActive(btnTabWaitlist, [btnTabBooking, btnTabGuests]);
       bookingTabContent.style.display = "none";
       waitlistTabContent.style.display = "block";
+      guestsTabContent.style.display = "none";
       renderWaitlistQueue();
+    });
+    
+    btnTabGuests.addEventListener("click", () => {
+      setTabActive(btnTabGuests, [btnTabBooking, btnTabWaitlist]);
+      bookingTabContent.style.display = "none";
+      waitlistTabContent.style.display = "none";
+      guestsTabContent.style.display = "block";
+      renderGuestDirectory();
+    });
+  }
+
+  // Guest Search listener
+  const guestSearchInput = document.getElementById("guest-search-input");
+  if (guestSearchInput) {
+    guestSearchInput.addEventListener("input", renderGuestDirectory);
+  }
+  
+  // Add Guest button listener
+  const btnAddNewGuest = document.getElementById("btn-add-new-guest");
+  if (btnAddNewGuest) {
+    btnAddNewGuest.addEventListener("click", () => {
+      showGuestProfileModal(null);
+    });
+  }
+  
+  // Guest Profile Form submit listener
+  const guestProfileForm = document.getElementById("guest-profile-form");
+  if (guestProfileForm) {
+    guestProfileForm.addEventListener("submit", handleGuestProfileSubmit);
+  }
+  
+  // Guest Profile Delete button listener
+  const btnDeleteGuestProfile = document.getElementById("btn-delete-guest-profile");
+  if (btnDeleteGuestProfile) {
+    btnDeleteGuestProfile.addEventListener("click", handleGuestProfileDelete);
+  }
+  
+  // Close Guest Modal listeners
+  const btnCloseGuestModal = document.getElementById("btn-close-guest-modal");
+  const btnCancelGuestModal = document.getElementById("btn-cancel-guest-modal");
+  const guestModalBackdrop = document.getElementById("guest-profile-modal-backdrop");
+  if (btnCloseGuestModal && guestModalBackdrop) {
+    btnCloseGuestModal.addEventListener("click", () => {
+      guestModalBackdrop.classList.remove("active");
+    });
+  }
+  if (btnCancelGuestModal && guestModalBackdrop) {
+    btnCancelGuestModal.addEventListener("click", () => {
+      guestModalBackdrop.classList.remove("active");
+    });
+  }
+  
+  // Autocomplete / phone booking autocomplete search
+  const manualPhone = document.getElementById("manual-phone");
+  const manualName = document.getElementById("manual-name");
+  const phoneMatchAlert = document.getElementById("phone-match-alert");
+  if (manualPhone) {
+    manualPhone.addEventListener("input", () => {
+      const phoneVal = manualPhone.value.trim();
+      if (phoneVal.length < 5) {
+        phoneMatchAlert.style.display = "none";
+        return;
+      }
+      const directory = getGuestDirectory();
+      const normInput = normalizePhone(phoneVal);
+      const matched = directory.find(g => normalizePhone(g.phone) === normInput);
+      
+      if (matched) {
+        phoneMatchAlert.style.display = "block";
+        phoneMatchAlert.className = ""; // clear old classes
+        
+        let statusText = "";
+        let classToAdd = "match-standard";
+        if (matched.isVIP) {
+          statusText += "★ VIP Guest ";
+          classToAdd = "match-vip";
+        }
+        if (matched.isRegular) {
+          statusText += "♦ Regular Guest ";
+          if (classToAdd !== "match-vip") classToAdd = "match-regular";
+        }
+        
+        let details = statusText ? `✨ <strong>${statusText}</strong>` : "✨ Guest Profile Found";
+        if (matched.allergies) {
+          details += ` | ⚠️ Allergy: <span style="color: #e74c3c; font-weight: bold;">${matched.allergies}</span>`;
+        }
+        if (matched.preferences) {
+          details += ` | 💡 Pref: <em>${matched.preferences}</em>`;
+        }
+        
+        phoneMatchAlert.innerHTML = details;
+        phoneMatchAlert.classList.add(classToAdd);
+        
+        if (manualName && !manualName.value.trim()) {
+          manualName.value = matched.name;
+        }
+      } else {
+        phoneMatchAlert.style.display = "none";
+      }
     });
   }
   
@@ -514,6 +628,37 @@ function getReservations() {
 // Save all reservations
 function saveAllReservations(reservations) {
   localStorage.setItem("kazu_backend_reservations", JSON.stringify(reservations));
+  
+  // Sync with guest directory
+  try {
+    const directory = getGuestDirectory();
+    let directoryChanged = false;
+    reservations.forEach(r => {
+      const normPhone = normalizePhone(r.guestPhone);
+      if (!normPhone) return;
+      const exists = directory.some(g => normalizePhone(g.phone) === normPhone);
+      if (!exists) {
+        const newGuest = {
+          phone: r.guestPhone,
+          name: r.guestName,
+          email: "",
+          isVIP: false,
+          isRegular: false,
+          allergies: "",
+          preferences: r.specialRequests || "",
+          visitCount: 1,
+          notes: "Added via booking."
+        };
+        directory.push(newGuest);
+        directoryChanged = true;
+      }
+    });
+    if (directoryChanged) {
+      saveGuestDirectory(directory);
+    }
+  } catch (err) {
+    console.error("Error syncing guest directory on reservation save:", err);
+  }
 }
 
 // Conflict checking engine (2-hour limit check)
@@ -760,10 +905,30 @@ function renderBookingsList() {
     const timeDetails = getSeatingTimeDetails(res);
     const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
 
+    // Fetch guest profile for VIP/Regular/Allergy badges
+    const directory = getGuestDirectory();
+    const guestProfile = directory.find(g => normalizePhone(g.phone) === normalizePhone(res.guestPhone));
+    let guestBadgesHtml = "";
+    let allergiesText = "";
+    if (guestProfile) {
+      if (guestProfile.isVIP) {
+        guestBadgesHtml += `<span class="badge-vip" style="margin-left: 0.4rem;">★ VIP</span>`;
+      }
+      if (guestProfile.isRegular) {
+        guestBadgesHtml += `<span class="badge-regular" style="margin-left: 0.4rem;">♦ Regular</span>`;
+      }
+      if (guestProfile.allergies) {
+        allergiesText = guestProfile.allergies;
+      }
+    }
+
     tr.innerHTML = `
       <td style="font-weight: bold; color: var(--color-text-light);">${format12Hour(res.timeSlot)}</td>
       <td>
-        <div style="font-weight: 600; color: var(--color-text-light);">${res.guestName}</div>
+        <div style="font-weight: 600; color: var(--color-text-light);">
+          ${res.guestName} ${guestBadgesHtml}
+          ${allergiesText ? `<span class="badge-allergy" style="margin-left: 0.4rem; font-size: 0.72rem; padding: 0.1rem 0.35rem;">⚠️ Allergy: ${allergiesText}</span>` : ""}
+        </div>
         <div style="font-size: 0.8rem; color: var(--color-text-muted);">${res.guestPhone}</div>
         ${res.specialRequests ? `<div style="font-size: 0.8rem; color: var(--color-accent); font-style: italic; margin-top: 0.15rem;">💬 "${res.specialRequests}"</div>` : ""}
       </td>
@@ -1333,16 +1498,34 @@ function showTableInspectionDetails(tableId) {
       const end12 = format12Hour(timeDetails.endTime);
       const lastOrder12 = format12Hour(timeDetails.lastOrderTime);
       
+      // Fetch guest profile for VIP/Regular/Allergy badges
+      const directory = getGuestDirectory();
+      const guestProfile = directory.find(g => normalizePhone(g.phone) === normalizePhone(bk.guestPhone));
+      let guestBadgesHtml = "";
+      if (guestProfile) {
+        if (guestProfile.isVIP) {
+          guestBadgesHtml += `<span class="badge-vip" style="margin-left: 0.3rem; font-size: 0.65rem; padding: 0.05rem 0.2rem; vertical-align: middle;">★ VIP</span>`;
+        }
+        if (guestProfile.isRegular) {
+          guestBadgesHtml += `<span class="badge-regular" style="margin-left: 0.3rem; font-size: 0.65rem; padding: 0.05rem 0.2rem; vertical-align: middle;">♦ REG</span>`;
+        }
+        if (guestProfile.allergies) {
+          guestBadgesHtml += `<span class="badge-allergy" style="margin-left: 0.3rem; font-size: 0.65rem; padding: 0.05rem 0.2rem; vertical-align: middle;" title="Allergy: ${guestProfile.allergies}">⚠️ ALLERGY</span>`;
+        }
+      }
+      
       html += `
         <div style="margin-bottom: 0.4rem; padding-bottom: 0.4rem; ${idx < all.length - 1 ? 'border-bottom: 1px dashed rgba(255,255,255,0.04);' : ''}">
           <div style="display: flex; justify-content: space-between;">
-            <div>Guest: <strong style="color: var(--color-text-light);">${bk.guestName}</strong> (${bk.partySize} pax)</div>
+            <div>Guest: <strong style="color: var(--color-text-light);">${bk.guestName}</strong> ${guestBadgesHtml} (${bk.partySize} pax)</div>
             <div style="font-size: 0.75rem; color: var(--color-accent); font-weight: 600;">Last Order: ${lastOrder12}</div>
           </div>
           <div style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 0.1rem;">
             Time: <strong>${start12} - ${end12}</strong> | Phone: ${bk.guestPhone}
           </div>
           ${bk.specialRequests ? `<div style="font-size: 0.75rem; color: var(--color-accent); font-style: italic; margin-top: 0.1rem;">💬 "${bk.specialRequests}"</div>` : ""}
+          ${(guestProfile && guestProfile.allergies) ? `<div style="font-size: 0.75rem; color: #e74c3c; font-weight: bold; margin-top: 0.15rem;">⚠️ Allergy: ${guestProfile.allergies}</div>` : ""}
+          ${(guestProfile && guestProfile.preferences) ? `<div style="font-size: 0.75rem; color: #3498db; margin-top: 0.15rem;">💡 Preference: ${guestProfile.preferences}</div>` : ""}
         </div>
       `;
     });
@@ -2285,4 +2468,331 @@ function getSeatingTimeDetails(res) {
     endTime: formatMins(nextStartMins),
     lastOrderTime: formatMins(lastOrderMins)
   };
+}
+
+// ==========================================
+// GUEST DIRECTORY & VIP TAGGING ENGINE
+// ==========================================
+
+function getGuestDirectory() {
+  const data = localStorage.getItem("kazu_guest_directory");
+  return data ? JSON.parse(data) : [];
+}
+
+function saveGuestDirectory(directory) {
+  localStorage.setItem("kazu_guest_directory", JSON.stringify(directory));
+}
+
+function normalizePhone(phone) {
+  if (!phone) return "";
+  return phone.replace(/[^0-9+]/g, "");
+}
+
+function getGuestBookingHistory(phone) {
+  const normPhone = normalizePhone(phone);
+  if (!normPhone) return [];
+  return getReservations().filter(r => normalizePhone(r.guestPhone) === normPhone);
+}
+
+function initializeGuestDirectoryIfEmpty() {
+  if (!localStorage.getItem("kazu_guest_directory")) {
+    const defaultGuests = [
+      {
+        phone: "027 493 2847",
+        name: "Kenji Sato",
+        email: "kenji.sato@example.com",
+        isVIP: true,
+        isRegular: true,
+        allergies: "",
+        preferences: "Prefers Grill stool 75",
+        visitCount: 3,
+        notes: "Loves premium cold sake."
+      },
+      {
+        phone: "022 431 8765",
+        name: "Yuki Matsuura",
+        email: "yuki.m@example.com",
+        isVIP: false,
+        isRegular: true,
+        allergies: "Shellfish",
+        preferences: "Prefers Grill stool 73",
+        visitCount: 5,
+        notes: "Regular visitor on Fridays."
+      },
+      {
+        phone: "021 987 6543",
+        name: "Satomi Takahashi",
+        email: "satomi.t@example.com",
+        isVIP: false,
+        isRegular: false,
+        allergies: "Gluten",
+        preferences: "Quiet seating",
+        visitCount: 1,
+        notes: "Brings guests frequently."
+      },
+      {
+        phone: "027 555 8888",
+        name: "Alice Cooper",
+        email: "alice.c@example.com",
+        isVIP: true,
+        isRegular: false,
+        allergies: "Peanuts",
+        preferences: "Window seat (Table 4)",
+        visitCount: 2,
+        notes: "Wellington arts patron."
+      },
+      {
+        phone: "022 555 3333",
+        name: "Liam O'Connor",
+        email: "liam.oc@example.com",
+        isVIP: false,
+        isRegular: true,
+        allergies: "",
+        preferences: "Sake Bar Table 85",
+        visitCount: 4,
+        notes: "Draft beer fan."
+      }
+    ];
+    saveGuestDirectory(defaultGuests);
+  }
+}
+
+function syncBookingWithGuestDirectory(booking) {
+  const directory = getGuestDirectory();
+  const normalizedBookingPhone = normalizePhone(booking.guestPhone);
+  if (!normalizedBookingPhone) return;
+  
+  let guest = directory.find(g => normalizePhone(g.phone) === normalizedBookingPhone);
+  if (guest) {
+    if (booking.guestName && guest.name !== booking.guestName) {
+      guest.name = booking.guestName;
+    }
+    if (booking.specialRequests && !guest.preferences) {
+      guest.preferences = booking.specialRequests;
+    }
+  } else {
+    guest = {
+      phone: booking.guestPhone,
+      name: booking.guestName,
+      email: "",
+      isVIP: false,
+      isRegular: false,
+      allergies: "",
+      preferences: booking.specialRequests || "",
+      visitCount: 1,
+      notes: "Added via manual booking."
+    };
+    directory.push(guest);
+  }
+  
+  directory.forEach(g => {
+    const history = getGuestBookingHistory(g.phone);
+    g.visitCount = history.filter(r => r.status !== "Cancelled").length;
+  });
+  
+  saveGuestDirectory(directory);
+  renderGuestDirectory();
+}
+
+function renderGuestDirectory() {
+  const container = document.getElementById("guest-list-container");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  const searchInput = document.getElementById("guest-search-input");
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  
+  const directory = getGuestDirectory();
+  
+  directory.forEach(g => {
+    const history = getGuestBookingHistory(g.phone);
+    g.visitCount = history.filter(r => r.status !== "Cancelled").length;
+  });
+  
+  const filtered = directory.filter(guest => {
+    return guest.name.toLowerCase().includes(query) || guest.phone.includes(query);
+  });
+  
+  if (filtered.length === 0) {
+    container.innerHTML = `<p style="font-style: italic; color: var(--color-text-muted); font-size: 0.85rem; text-align: center; margin-top: 1rem;">No guests found.</p>`;
+    return;
+  }
+  
+  filtered.sort((a, b) => {
+    if (a.isVIP && !b.isVIP) return -1;
+    if (!a.isVIP && b.isVIP) return 1;
+    if (a.isRegular && !b.isRegular) return -1;
+    if (!a.isRegular && b.isRegular) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  
+  filtered.forEach(guest => {
+    const card = document.createElement("div");
+    card.className = "guest-card";
+    
+    let badgesHtml = "";
+    if (guest.isVIP) {
+      badgesHtml += `<span class="badge-vip">★ VIP</span>`;
+    }
+    if (guest.isRegular) {
+      badgesHtml += `<span class="badge-regular">♦ Regular</span>`;
+    }
+    if (guest.allergies) {
+      badgesHtml += `<span class="badge-allergy" title="Allergies: ${guest.allergies}">⚠️ Allergy</span>`;
+    }
+    
+    card.innerHTML = `
+      <div class="guest-card-header">
+        <div class="guest-card-name">${guest.name}</div>
+        <div style="font-size: 0.75rem; color: var(--color-accent); font-weight: bold;">Visits: ${guest.visitCount || 0}</div>
+      </div>
+      <div class="guest-card-phone">${guest.phone}</div>
+      ${guest.allergies ? `<div class="guest-card-meta" style="color: #e74c3c; font-weight: bold;">⚠️ Allergy: ${guest.allergies}</div>` : ""}
+      ${guest.preferences ? `<div class="guest-card-meta">💡 Pref: ${guest.preferences}</div>` : ""}
+      <div class="guest-card-badges">${badgesHtml || `<span style="font-size: 0.75rem; color: var(--color-text-muted); font-style: italic;">Standard Profile</span>`}</div>
+    `;
+    
+    card.addEventListener("click", () => {
+      showGuestProfileModal(guest.phone);
+    });
+    
+    container.appendChild(card);
+  });
+}
+
+function showGuestProfileModal(phone) {
+  const modalBackdrop = document.getElementById("guest-profile-modal-backdrop");
+  const modalTitle = document.getElementById("guest-modal-title");
+  const form = document.getElementById("guest-profile-form");
+  const deleteBtn = document.getElementById("btn-delete-guest-profile");
+  const historyContainer = document.getElementById("guest-booking-history");
+  
+  if (!modalBackdrop) return;
+  
+  form.reset();
+  historyContainer.innerHTML = "";
+  
+  if (phone) {
+    const directory = getGuestDirectory();
+    const guest = directory.find(g => normalizePhone(g.phone) === normalizePhone(phone));
+    if (!guest) return;
+    
+    modalTitle.innerHTML = `👥 Edit Guest Profile`;
+    document.getElementById("guest-profile-original-phone").value = guest.phone;
+    document.getElementById("guest-profile-name").value = guest.name;
+    document.getElementById("guest-profile-phone").value = guest.phone;
+    document.getElementById("guest-profile-email").value = guest.email || "";
+    document.getElementById("guest-profile-vip").checked = guest.isVIP || false;
+    document.getElementById("guest-profile-regular").checked = guest.isRegular || false;
+    document.getElementById("guest-profile-allergies").value = guest.allergies || "";
+    document.getElementById("guest-profile-preferences").value = guest.preferences || "";
+    
+    if (deleteBtn) deleteBtn.style.display = "block";
+    
+    const history = getGuestBookingHistory(guest.phone);
+    if (history.length === 0) {
+      historyContainer.innerHTML = `<span style="font-style: italic; color: var(--color-text-muted);">No bookings found.</span>`;
+    } else {
+      history.sort((a, b) => b.date.localeCompare(a.date) || b.timeSlot.localeCompare(a.timeSlot));
+      history.forEach(r => {
+        const item = document.createElement("div");
+        item.style.marginBottom = "0.3rem";
+        
+        let statusStyle = "color: #2ecc71; font-weight: bold;";
+        if (r.status === "Cancelled") statusStyle = "color: #e74c3c;";
+        if (r.status === "Checked In") statusStyle = "color: #3498db; font-weight: bold;";
+        
+        item.innerHTML = `📅 <strong>${r.date}</strong> at ${format12Hour(r.timeSlot)} (${formatTableDisplay(r.tableId)}) - <span style="${statusStyle}">${r.status}</span>`;
+        historyContainer.appendChild(item);
+      });
+    }
+  } else {
+    modalTitle.innerHTML = `👥 Create Guest Profile`;
+    document.getElementById("guest-profile-original-phone").value = "";
+    if (deleteBtn) deleteBtn.style.display = "none";
+    historyContainer.innerHTML = `<span style="font-style: italic; color: var(--color-text-muted);">New profile (no history).</span>`;
+  }
+  
+  modalBackdrop.classList.add("active");
+}
+
+function handleGuestProfileSubmit(e) {
+  e.preventDefault();
+  
+  const originalPhone = document.getElementById("guest-profile-original-phone").value;
+  const name = document.getElementById("guest-profile-name").value.trim();
+  const phone = document.getElementById("guest-profile-phone").value.trim();
+  const email = document.getElementById("guest-profile-email").value.trim();
+  const isVIP = document.getElementById("guest-profile-vip").checked;
+  const isRegular = document.getElementById("guest-profile-regular").checked;
+  const allergies = document.getElementById("guest-profile-allergies").value.trim();
+  const preferences = document.getElementById("guest-profile-preferences").value.trim();
+  
+  const directory = getGuestDirectory();
+  
+  if (normalizePhone(phone) !== normalizePhone(originalPhone)) {
+    const dupe = directory.find(g => normalizePhone(g.phone) === normalizePhone(phone));
+    if (dupe) {
+      alert(`Conflict: A guest profile with the phone number ${phone} already exists.`);
+      return;
+    }
+  }
+  
+  if (originalPhone) {
+    const idx = directory.findIndex(g => normalizePhone(g.phone) === normalizePhone(originalPhone));
+    if (idx !== -1) {
+      directory[idx] = {
+        ...directory[idx],
+        name,
+        phone,
+        email,
+        isVIP,
+        isRegular,
+        allergies,
+        preferences
+      };
+    }
+  } else {
+    const newGuest = {
+      name,
+      phone,
+      email,
+      isVIP,
+      isRegular,
+      allergies,
+      preferences,
+      visitCount: 0,
+      notes: "Manually created."
+    };
+    directory.push(newGuest);
+  }
+  
+  saveGuestDirectory(directory);
+  document.getElementById("guest-profile-modal-backdrop").classList.remove("active");
+  renderGuestDirectory();
+  renderBookingsList();
+  
+  const manualPhone = document.getElementById("manual-phone");
+  if (manualPhone) {
+    manualPhone.dispatchEvent(new Event("input"));
+  }
+}
+
+function handleGuestProfileDelete() {
+  const originalPhone = document.getElementById("guest-profile-original-phone").value;
+  if (!originalPhone) return;
+  
+  if (confirm("Are you sure you want to delete this guest profile? Historical bookings will not be deleted.")) {
+    let directory = getGuestDirectory();
+    directory = directory.filter(g => normalizePhone(g.phone) !== normalizePhone(originalPhone));
+    saveGuestDirectory(directory);
+    document.getElementById("guest-profile-modal-backdrop").classList.remove("active");
+    renderGuestDirectory();
+    renderBookingsList();
+    
+    const manualPhone = document.getElementById("manual-phone");
+    if (manualPhone) {
+      manualPhone.dispatchEvent(new Event("input"));
+    }
+  }
 }
