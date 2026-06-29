@@ -83,11 +83,19 @@ const btnModalOverride = document.getElementById("btn-modal-override");
 // Simulated Email logs
 let processedEmails = [];
 
+// Gmail integration state
+let gmailAccessToken = null;
+let gmailTokenExpiry = 0;
+let gmailPollInterval = null;
+let processedGmailIds = new Set(JSON.parse(localStorage.getItem("kazu_gmail_ids") || "[]"));
+
 // System settings cache
 let systemSettings = {
   email: "bookings@kazu.co.nz",
   openTime: "17:00",
   closeTime: "22:00",
+  googleClientId: "",
+  gmailQuery: "is:unread subject:(reservation OR booking OR table)",
   firebaseEnabled: false,
   firebaseConfig: {
     apiKey: "",
@@ -418,6 +426,27 @@ document.addEventListener("DOMContentLoaded", () => {
       analyticsModal.classList.remove("active");
     });
   }
+
+  // Gmail connection button bindings
+  const btnGmailConnect = document.getElementById("btn-gmail-connect");
+  const btnGmailSync = document.getElementById("btn-gmail-sync");
+  const btnGmailDisconnect = document.getElementById("btn-gmail-disconnect");
+  if (btnGmailConnect) btnGmailConnect.addEventListener("click", connectGmail);
+  if (btnGmailSync) btnGmailSync.addEventListener("click", fetchGmailBookings);
+  if (btnGmailDisconnect) btnGmailDisconnect.addEventListener("click", disconnectGmail);
+
+  // Init Gmail auth once GIS library has loaded
+  updateGmailUI();
+  if (systemSettings.googleClientId) {
+    const tryInit = () => {
+      if (window.google && window.google.accounts) {
+        initGmailAuth();
+      } else {
+        setTimeout(tryInit, 200);
+      }
+    };
+    tryInit();
+  }
 });
 
 // Time conversion utilities
@@ -479,11 +508,16 @@ function loadSettings() {
 function populateSettingsUI() {
   document.getElementById("settings-email").value = systemSettings.email || "";
   document.getElementById("settings-open-time").value = systemSettings.openTime || "17:00";
-  
+
+  const clientIdEl = document.getElementById("settings-google-client-id");
+  if (clientIdEl) clientIdEl.value = systemSettings.googleClientId || "";
+  const gmailQueryEl = document.getElementById("settings-gmail-query");
+  if (gmailQueryEl) gmailQueryEl.value = systemSettings.gmailQuery || "is:unread subject:(reservation OR booking OR table)";
+
   const fbEnable = !!systemSettings.firebaseEnabled;
   document.getElementById("settings-firebase-enable").checked = fbEnable;
   document.getElementById("firebase-fields-container").style.display = fbEnable ? "flex" : "none";
-  
+
   const config = systemSettings.firebaseConfig || {};
   document.getElementById("settings-firebase-apiKey").value = config.apiKey || "";
   document.getElementById("settings-firebase-projectId").value = config.projectId || "";
@@ -494,10 +528,15 @@ function populateSettingsUI() {
 // Save system configurations
 function saveSettings(e) {
   e.preventDefault();
-  
+
   systemSettings.email = document.getElementById("settings-email").value.trim() || "bookings@kazu.co.nz";
   systemSettings.openTime = document.getElementById("settings-open-time").value;
-  
+
+  const clientIdEl = document.getElementById("settings-google-client-id");
+  if (clientIdEl) systemSettings.googleClientId = clientIdEl.value.trim();
+  const gmailQueryEl = document.getElementById("settings-gmail-query");
+  if (gmailQueryEl) systemSettings.gmailQuery = gmailQueryEl.value.trim() || "is:unread subject:(reservation OR booking OR table)";
+
   const fbEnable = document.getElementById("settings-firebase-enable").checked;
   systemSettings.firebaseEnabled = fbEnable;
   
@@ -532,6 +571,8 @@ function resetSettings() {
       email: "bookings@kazu.co.nz",
       openTime: "17:00",
       closeTime: "22:00",
+      googleClientId: "",
+      gmailQuery: "is:unread subject:(reservation OR booking OR table)",
       firebaseEnabled: false,
       firebaseConfig: {
         apiKey: "",
@@ -980,6 +1021,219 @@ window.changeStatus = function(refCode, newStatus) {
     updateTableDropdownAvailability();
   }
 };
+
+// ==========================================
+// GMAIL LIVE INTEGRATION ENGINE
+// ==========================================
+
+function isGmailConnected() {
+  return !!(gmailAccessToken && Date.now() < gmailTokenExpiry);
+}
+
+function saveProcessedGmailIds() {
+  localStorage.setItem("kazu_gmail_ids", JSON.stringify([...processedGmailIds]));
+}
+
+function initGmailAuth() {
+  if (!window.google || !window.google.accounts || !systemSettings.googleClientId) return;
+  window._gmailTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: systemSettings.googleClientId,
+    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    callback: (tokenResponse) => {
+      if (tokenResponse.error) {
+        showToast("Gmail connection failed: " + tokenResponse.error);
+        return;
+      }
+      gmailAccessToken = tokenResponse.access_token;
+      gmailTokenExpiry = Date.now() + (tokenResponse.expires_in - 60) * 1000;
+      updateGmailUI();
+      fetchGmailBookings();
+      startGmailPoll();
+    }
+  });
+}
+
+function connectGmail() {
+  if (!systemSettings.googleClientId) {
+    alert("Please enter your Google OAuth Client ID in Settings (⚙️) first.");
+    openSettingsDrawer();
+    return;
+  }
+  if (!window.google || !window.google.accounts) {
+    showToast("Google Sign-In library is still loading, please try again.");
+    return;
+  }
+  if (!window._gmailTokenClient) initGmailAuth();
+  if (window._gmailTokenClient) window._gmailTokenClient.requestAccessToken();
+}
+
+function disconnectGmail() {
+  if (gmailAccessToken && window.google && window.google.accounts) {
+    google.accounts.oauth2.revoke(gmailAccessToken, () => {});
+  }
+  gmailAccessToken = null;
+  gmailTokenExpiry = 0;
+  stopGmailPoll();
+  updateGmailUI();
+  showToast("Gmail disconnected.");
+}
+
+function startGmailPoll() {
+  stopGmailPoll();
+  gmailPollInterval = setInterval(() => {
+    if (isGmailConnected()) {
+      fetchGmailBookings();
+    } else {
+      stopGmailPoll();
+      updateGmailUI();
+    }
+  }, 30000);
+}
+
+function stopGmailPoll() {
+  if (gmailPollInterval) { clearInterval(gmailPollInterval); gmailPollInterval = null; }
+}
+
+async function fetchGmailBookings() {
+  if (!isGmailConnected()) return;
+  updateGmailSyncStatus("Syncing...");
+
+  try {
+    const query = encodeURIComponent(systemSettings.gmailQuery || "is:unread subject:(reservation OR booking OR table)");
+    const listRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=25`,
+      { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
+    );
+
+    if (listRes.status === 401) {
+      gmailAccessToken = null;
+      updateGmailUI();
+      updateGmailSyncStatus("Session expired — reconnect");
+      return;
+    }
+
+    const listData = await listRes.json();
+    if (!listData.messages || listData.messages.length === 0) {
+      updateGmailSyncStatus(`Synced ${new Date().toLocaleTimeString()}`);
+      return;
+    }
+
+    let newCount = 0;
+    for (const msg of listData.messages) {
+      if (processedGmailIds.has(msg.id)) continue;
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+        { headers: { Authorization: `Bearer ${gmailAccessToken}` } }
+      );
+      const msgData = await msgRes.json();
+      const parsed = parseGmailMessage(msgData);
+      processedGmailIds.add(msg.id);
+      if (parsed) { processEmailFromGmail(parsed, msg.id); newCount++; }
+    }
+
+    saveProcessedGmailIds();
+    updateGmailSyncStatus(`Synced ${new Date().toLocaleTimeString()}`);
+
+    if (newCount > 0) {
+      renderEmailLog();
+      renderBookingsList();
+      showToast(`${newCount} new booking email${newCount > 1 ? "s" : ""} imported!`);
+    }
+  } catch (err) {
+    console.error("Gmail fetch error:", err);
+    updateGmailSyncStatus("Sync failed");
+  }
+}
+
+function extractGmailBody(payload) {
+  if (payload.body && payload.body.data) {
+    try { return atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/")); } catch (e) { return null; }
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/plain") { const t = extractGmailBody(part); if (t) return t; }
+    }
+    for (const part of payload.parts) {
+      const t = extractGmailBody(part); if (t) return t;
+    }
+  }
+  return null;
+}
+
+function parseGmailMessage(msg) {
+  const headers = msg.payload.headers || [];
+  const subject = headers.find(h => h.name === "Subject")?.value || "Booking Request";
+  const from = headers.find(h => h.name === "From")?.value || "unknown@email.com";
+  const bodyText = extractGmailBody(msg.payload);
+  if (!bodyText) return null;
+  const parsed = parseEmailBody(bodyText);
+  if (!parsed || parsed.name === "Email Guest") return null;
+  return { subject, from, parsed };
+}
+
+function processEmailFromGmail(msgInfo, gmailId) {
+  const { subject, from, parsed } = msgInfo;
+  const maxTimeStr = "20:00";
+  const startMins = timeToMinutes(systemSettings.openTime);
+  const endMins = timeToMinutes(maxTimeStr);
+  const targetMins = timeToMinutes(parsed.timeSlot);
+  const timeValid = (targetMins >= startMins && targetMins <= endMins);
+  const allocatedTable = autoAllocateTable(parsed.partySize, parsed.date, parsed.timeSlot);
+
+  const refCode = `KAZU-${Math.floor(1000 + Math.random() * 9000)}`;
+  const bookingObj = {
+    id: refCode, gmailId,
+    guestName: parsed.name, guestPhone: parsed.phone,
+    date: parsed.date, timeSlot: parsed.timeSlot, partySize: parsed.partySize,
+    tableId: allocatedTable ? allocatedTable.id : "1",
+    specialRequests: `From Gmail — ${from}`,
+    status: "Confirmed", hasConflict: false
+  };
+
+  const isConflict = !timeValid || !allocatedTable || allocatedTable.isConflicted;
+  const alternatives = isConflict ? findAlternativeSlots(parsed.partySize, parsed.date, parsed.timeSlot) : [];
+  const replyData = { name: parsed.name, partySize: parsed.partySize, date: parsed.date, timeSlot: parsed.timeSlot, refCode, alternatives };
+  const replyDraft = isConflict
+    ? generateReplyDraft(alternatives.length > 0 ? "alternative" : "declined", replyData)
+    : generateReplyDraft("confirmed", replyData);
+
+  const emailLogObj = {
+    id: refCode, gmailId, sender: from, subject, parsedData: parsed,
+    booking: bookingObj,
+    status: isConflict ? "Manual Review" : "Auto-Saved",
+    alternatives, replyDraft
+  };
+
+  if (!isConflict) {
+    const current = getReservations();
+    current.push(bookingObj);
+    saveAllReservations(current);
+  } else {
+    emailLogObj.booking.hasConflict = true;
+  }
+
+  processedEmails.push(emailLogObj);
+}
+
+function updateGmailUI() {
+  const statusEl = document.getElementById("gmail-status-text");
+  const connectBtn = document.getElementById("btn-gmail-connect");
+  const syncBtn = document.getElementById("btn-gmail-sync");
+  const disconnectBtn = document.getElementById("btn-gmail-disconnect");
+  if (!statusEl) return;
+
+  const connected = isGmailConnected();
+  statusEl.textContent = connected ? "Connected" : "Not connected";
+  statusEl.style.color = connected ? "#2ecc71" : "var(--color-text-muted)";
+  if (connectBtn) connectBtn.style.display = connected ? "none" : "inline-flex";
+  if (syncBtn) syncBtn.style.display = connected ? "inline-flex" : "none";
+  if (disconnectBtn) disconnectBtn.style.display = connected ? "inline-flex" : "none";
+}
+
+function updateGmailSyncStatus(text) {
+  const el = document.getElementById("gmail-sync-status");
+  if (el) el.textContent = text;
+}
 
 // ==========================================
 // MOCK EMAIL INTEGRATION ENGINE

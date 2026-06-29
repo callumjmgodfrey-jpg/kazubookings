@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Console | Kazu Yakitori & Sake Bar</title>
   <link rel="stylesheet" href="index.css">
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <script>
     if (sessionStorage.getItem("kazu_logged_in") !== "true") {
       window.location.replace("login.html");
@@ -177,7 +178,21 @@
             <span>✉️ Email Bookings</span>
             <span id="active-email-display" style="font-size: 0.75rem; font-family: var(--font-sans); color: var(--color-text-muted); font-weight: normal;"></span>
           </h2>
-          
+
+          <!-- Gmail Connection Bar -->
+          <div class="glass-panel" style="margin-bottom: 1rem; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; min-width: 0;">
+              <span style="color: var(--color-text-muted);">📧 Gmail:</span>
+              <span id="gmail-status-text" style="font-weight: 600; color: var(--color-text-muted);">Not connected</span>
+              <span id="gmail-sync-status" style="font-size: 0.75rem; color: var(--color-text-muted); font-style: italic;"></span>
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+              <button id="btn-gmail-connect" class="btn btn-accent" style="font-size: 0.75rem; padding: 0.3rem 0.8rem;">Connect Gmail</button>
+              <button id="btn-gmail-sync" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.8rem; display: none;">🔄 Sync</button>
+              <button id="btn-gmail-disconnect" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.8rem; display: none; color: #e74c3c; border-color: rgba(231,76,60,0.3);">Disconnect</button>
+            </div>
+          </div>
+
           <!-- Mock Email Simulation Box -->
           <div class="glass-panel column-card" style="margin-bottom: 1rem;">
             <h3 style="font-size: 1rem; color: var(--color-accent); margin-bottom: 0.8rem; font-family: var(--font-sans);">Simulate Incoming Email</h3>
@@ -525,6 +540,22 @@
         <div style="margin-top: 1.5rem; margin-bottom: 1.5rem; border-top: 1px solid var(--border-glass); padding-top: 1.5rem;">
           <h3 style="font-size: 1rem; color: var(--color-text-light); margin-bottom: 0.5rem; font-family: var(--font-sans);">Restaurant Rules</h3>
           <button type="button" class="btn btn-accent btn-block" id="btn-open-table-config">🔧 Configure Tables & Priorities</button>
+        </div>
+
+        <!-- Gmail Integration Config -->
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 1.5rem; margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1rem; color: var(--color-text-light); margin-bottom: 0.5rem; font-family: var(--font-sans);">📧 Gmail Integration</h3>
+          <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 0.8rem; line-height: 1.3; font-family: var(--font-sans);">
+            Paste your Google OAuth Client ID to enable live inbox syncing. Requires a Google Cloud project with the Gmail API enabled.
+          </p>
+          <div class="form-group" style="margin-bottom: 0.6rem;">
+            <label for="settings-google-client-id" style="font-size: 0.75rem;">OAuth Client ID</label>
+            <input type="text" id="settings-google-client-id" class="input-control" style="font-size: 0.8rem; padding: 0.4rem;" placeholder="123456789-abc...apps.googleusercontent.com">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="settings-gmail-query" style="font-size: 0.75rem;">Search Query</label>
+            <input type="text" id="settings-gmail-query" class="input-control" style="font-size: 0.8rem; padding: 0.4rem;" placeholder="is:unread subject:(reservation OR booking OR table)">
+          </div>
         </div>
 
         <!-- Firebase Cloud Sync Config -->
