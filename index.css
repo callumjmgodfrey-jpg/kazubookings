@@ -454,6 +454,23 @@ select.input-control {
   border: 1px solid rgba(52, 152, 219, 0.3);
 }
 
+.status-declined {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.status-replied {
+  background: rgba(155, 89, 182, 0.15);
+  color: #9b59b6;
+  border: 1px solid rgba(155, 89, 182, 0.3);
+}
+
+@keyframes kauzFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .email-log-details {
   color: var(--color-text-muted);
   font-size: 0.8rem;

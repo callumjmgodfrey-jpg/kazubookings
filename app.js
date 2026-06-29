@@ -1024,36 +1024,33 @@ function handleEmailPresetChange() {
 function handleEmailSimulation() {
   const val = document.getElementById("email-preset").value;
   const rawText = document.getElementById("email-custom-text").value.trim();
-  
+
   if (val === "0") {
     alert("Please select a template or paste custom email body to simulate.");
     return;
   }
-  
+
   let subject = "Inquiry: Table Reservation";
   let sender = "inquiries@customer.co.nz";
-  
+
   if (val !== "custom") {
     subject = EMAIL_TEMPLATES[val].subject;
     sender = EMAIL_TEMPLATES[val].sender;
   }
-  
+
   const parsed = parseEmailBody(rawText);
   if (!parsed) {
     alert("Error: Could not parse booking details from the email text.");
     return;
   }
-  
-  const d = new Date(parsed.date);
-  const dayOfWeek = d.getDay();
+
   const maxTimeStr = "20:00";
   const startMins = timeToMinutes(systemSettings.openTime);
   const endMins = timeToMinutes(maxTimeStr);
   const targetMins = timeToMinutes(parsed.timeSlot);
-  
   const timeValid = (targetMins >= startMins && targetMins <= endMins);
   const allocatedTable = autoAllocateTable(parsed.partySize, parsed.date, parsed.timeSlot);
-  
+
   const refCode = `KAZU-${Math.floor(1000 + Math.random() * 9000)}`;
   const bookingObj = {
     id: refCode,
@@ -1067,45 +1064,52 @@ function handleEmailSimulation() {
     status: "Confirmed",
     hasConflict: false
   };
-  
+
+  const isConflict = !timeValid || !allocatedTable || allocatedTable.isConflicted;
+  const alternatives = isConflict
+    ? findAlternativeSlots(parsed.partySize, parsed.date, parsed.timeSlot)
+    : [];
+
+  const replyData = { name: parsed.name, partySize: parsed.partySize, date: parsed.date, timeSlot: parsed.timeSlot, refCode, alternatives };
+  const replyDraft = isConflict
+    ? generateReplyDraft(alternatives.length > 0 ? "alternative" : "declined", replyData)
+    : generateReplyDraft("confirmed", replyData);
+
   const emailLogObj = {
     id: refCode,
-    sender: sender,
-    subject: subject,
+    sender,
+    subject,
     parsedData: parsed,
     booking: bookingObj,
-    status: "Auto-Saved"
+    status: isConflict ? "Manual Review" : "Auto-Saved",
+    alternatives,
+    replyDraft
   };
-  
+
   if (!timeValid) {
-    emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     emailLogObj.booking.specialRequests += ` [ALERT: Past Allowed Hours (${format12Hour(maxTimeStr)})]`;
     processedEmails.push(emailLogObj);
-    alert(`⚠️ Email Parsed! The requested time ${format12Hour(parsed.timeSlot)} is outside allowed hours (Limits: ${format12Hour(systemSettings.openTime)} - ${format12Hour(maxTimeStr)}). Surfaced in log for review.`);
+    alert(`⚠️ Email Parsed! The requested time ${format12Hour(parsed.timeSlot)} is outside allowed hours. Surfaced in log for review.`);
   } else if (allocatedTable && allocatedTable.isConflicted) {
-    emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     processedEmails.push(emailLogObj);
     alert(`⚠️ Email Parsed! A booking conflict was detected for ${parsed.name} at ${format12Hour(parsed.timeSlot)}. Surfacing in log for review.`);
   } else if (!allocatedTable) {
-    emailLogObj.status = "Manual Review";
     emailLogObj.booking.hasConflict = true;
     processedEmails.push(emailLogObj);
-    alert(`⚠️ Email Parsed! No clean tables available for party of ${parsed.partySize} at ${format12Hour(parsed.timeSlot)}. Surfaced in log for manual review.`);
+    alert(`⚠️ Email Parsed! No tables available for party of ${parsed.partySize} at ${format12Hour(parsed.timeSlot)}. Surfaced for manual review.`);
   } else {
-    emailLogObj.status = "Auto-Saved";
     const current = getReservations();
     current.push(bookingObj);
     saveAllReservations(current);
     processedEmails.push(emailLogObj);
-    
-    alert(`✓ Email Auto-Imported! Reservation saved successfully for ${parsed.name} (Table ${allocatedTable.display}).`);
+    alert(`✓ Email Auto-Imported! Reservation saved for ${parsed.name} (Table ${allocatedTable.display}).`);
   }
-  
+
   renderEmailLog();
   renderBookingsList();
-  
+
   document.getElementById("email-preset").value = "0";
   document.getElementById("email-custom-text").value = "";
   document.getElementById("custom-email-wrapper").style.display = "none";
@@ -1138,6 +1142,91 @@ function autoAllocateTable(partySize, date, timeSlot) {
   
   const firstTable = eligibleTables[0];
   return { id: firstTable.id, display: formatTableDisplay(firstTable.id), isConflicted: true };
+}
+
+// Find alternative available time slots near a conflicted request
+function findAlternativeSlots(partySize, date, requestedTimeSlot, maxResults = 3) {
+  const requestedMins = timeToMinutes(requestedTimeSlot);
+  const openMins = timeToMinutes(systemSettings.openTime);
+  const closeMins = timeToMinutes("20:00");
+  const found = [];
+
+  for (let delta = 30; delta <= 120 && found.length < maxResults; delta += 30) {
+    for (const sign of [-1, 1]) {
+      if (found.length >= maxResults) break;
+      const mins = requestedMins + sign * delta;
+      if (mins < openMins || mins > closeMins) continue;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      const t = `${h < 10 ? "0" : ""}${h}:${m < 10 ? "0" : ""}${m}`;
+      const allocated = autoAllocateTable(partySize, date, t);
+      if (allocated && !allocated.isConflicted) {
+        found.push({ timeSlot: t, tableId: allocated.id, tableDisplay: allocated.display });
+      }
+    }
+  }
+  return found;
+}
+
+function formatNiceDate(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dt = new Date(y, m - 1, d);
+  return `${days[dt.getDay()]}, ${d} ${months[m - 1]} ${y}`;
+}
+
+function generateReplyDraft(type, data) {
+  const firstName = data.name.split(" ")[0];
+  const niceDate = formatNiceDate(data.date);
+  const niceTime = format12Hour(data.timeSlot);
+  const paxWord = data.partySize === 1 ? "person" : "people";
+
+  if (type === "confirmed") {
+    return `Hi ${firstName},\n\nGreat news — we've confirmed your reservation at Kazu Yakitori & Sake Bar!\n\n📅 Date: ${niceDate}\n⏰ Time: ${niceTime}\n👥 Party: ${data.partySize} ${paxWord}\n🏮 Booking Ref: ${data.refCode}\n\nWe're at Level 1, 43 Courtenay Place, Wellington. Please let us know if anything changes.\n\nLooking forward to seeing you!\nKazu Team`;
+  }
+  if (type === "declined") {
+    return `Hi ${firstName},\n\nThank you for your booking request at Kazu Yakitori & Sake Bar.\n\nUnfortunately we're fully booked on ${niceDate} at ${niceTime} and are unable to accommodate your reservation at this time.\n\nWe'd love to welcome you another time — feel free to reach out for a different date or time.\n\nWarm regards,\nKazu Team`;
+  }
+  if (type === "alternative") {
+    const altLines = data.alternatives.map(a => `  • ${format12Hour(a.timeSlot)}`).join("\n");
+    return `Hi ${firstName},\n\nThank you for your booking request at Kazu Yakitori & Sake Bar.\n\nUnfortunately ${niceTime} on ${niceDate} is fully booked for ${data.partySize} ${paxWord}, but we have availability at:\n\n${altLines}\n\nWould any of these times work for you? Just reply and we'll confirm your spot right away!\n\nWarm regards,\nKazu Team`;
+  }
+  return "";
+}
+
+function showToast(message) {
+  const existing = document.getElementById("kazu-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.id = "kazu-toast";
+  toast.textContent = message;
+  toast.style.cssText = "position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:rgba(22,18,18,0.97);color:var(--color-accent);border:1px solid var(--color-accent);padding:0.7rem 1.4rem;border-radius:8px;font-size:0.9rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.5);animation:kauzFadeIn 0.2s ease;white-space:nowrap;";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+function showReplyModal(text) {
+  const existing = document.getElementById("reply-text-modal");
+  if (existing) existing.remove();
+  const backdrop = document.createElement("div");
+  backdrop.id = "reply-text-modal";
+  backdrop.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:2000;display:flex;align-items:center;justify-content:center;padding:1rem;";
+  backdrop.innerHTML = `
+    <div style="background:#141212;border:1px solid var(--color-accent);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;box-shadow:0 10px 40px rgba(0,0,0,0.7);">
+      <h3 style="color:var(--color-accent);margin-bottom:0.6rem;font-family:var(--font-sans);">📋 Reply Draft</h3>
+      <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:0.8rem;">Select all and copy the text below to send your reply:</p>
+      <textarea id="reply-draft-textarea" style="width:100%;height:210px;background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);color:var(--color-text-light);padding:0.8rem;border-radius:6px;font-size:0.85rem;line-height:1.5;resize:none;font-family:var(--font-sans);" readonly>${text}</textarea>
+      <div style="display:flex;gap:0.8rem;margin-top:1rem;justify-content:flex-end;">
+        <button onclick="document.getElementById('reply-text-modal').remove()" class="btn btn-secondary" style="font-size:0.85rem;padding:0.5rem 1rem;">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  setTimeout(() => {
+    const ta = document.getElementById("reply-draft-textarea");
+    if (ta) { ta.focus(); ta.select(); }
+  }, 100);
+  backdrop.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.remove(); });
 }
 
 // Auto-suggest the best available table for the manual form inputs
@@ -1236,74 +1325,190 @@ function parseEmailBody(bodyText) {
 function renderEmailLog() {
   const container = document.getElementById("email-log-container");
   const countLabel = document.getElementById("log-count");
-  
+
   countLabel.textContent = `(${processedEmails.length})`;
-  
+
   if (processedEmails.length === 0) {
-    container.innerHTML = `
-      <p style="color: var(--color-text-muted); font-style: italic; text-align: center; margin-top: 2rem; font-size: 0.85rem;">
-        No emails processed in this session.
-      </p>
-    `;
+    container.innerHTML = `<p style="color:var(--color-text-muted);font-style:italic;text-align:center;margin-top:2rem;font-size:0.85rem;">No emails processed in this session.</p>`;
     return;
   }
-  
+
   container.innerHTML = "";
-  
+
   [...processedEmails].reverse().forEach(log => {
     const item = document.createElement("div");
     item.className = "email-log-item";
-    
-    let statusClass = "status-autosave";
-    if (log.status === "Manual Review") statusClass = "status-pending";
-    else if (log.status === "Resolved") statusClass = "status-resolved";
-    
-    let actionBtnHtml = "";
+
+    const statusMap = {
+      "Auto-Saved":    "status-autosave",
+      "Manual Review": "status-pending",
+      "Resolved":      "status-resolved",
+      "Confirmed":     "status-autosave",
+      "Declined":      "status-declined",
+      "Replied":       "status-replied"
+    };
+    const statusClass = statusMap[log.status] || "status-pending";
+
+    // Alternative slots section (only for unresolved Manual Review items)
+    let alternativesHtml = "";
     if (log.status === "Manual Review") {
-      actionBtnHtml = `
-        <button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; margin-top: 0.4rem; background: var(--color-primary);"
-                onclick="triggerEmailReview('${log.id}')">
-          Review & Resolve
-        </button>
-      `;
+      if (log.alternatives && log.alternatives.length > 0) {
+        const altBtns = log.alternatives.map((alt, idx) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0.3rem 0.5rem;background:rgba(0,0,0,0.2);border-radius:4px;margin-bottom:0.3rem;">
+            <span style="color:var(--color-text-light);font-weight:600;font-size:0.85rem;">${format12Hour(alt.timeSlot)}</span>
+            <button class="btn btn-accent" style="font-size:0.7rem;padding:0.2rem 0.5rem;" onclick="confirmAlternativeSlot('${log.id}',${idx})">Confirm This Slot</button>
+          </div>`).join("");
+        alternativesHtml = `
+          <div style="margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid var(--border-glass);">
+            <div style="font-size:0.75rem;color:var(--color-text-muted);margin-bottom:0.4rem;">⏰ Available alternative times:</div>
+            ${altBtns}
+          </div>`;
+      } else {
+        alternativesHtml = `<div style="margin-top:0.5rem;font-size:0.78rem;color:#e74c3c;font-style:italic;">No alternative slots found on this date.</div>`;
+      }
     }
-    
+
+    // Action buttons row
+    let actionsHtml = `<div style="display:flex;gap:0.4rem;margin-top:0.6rem;flex-wrap:wrap;">`;
+
+    if (log.status === "Manual Review") {
+      actionsHtml += `<button class="btn btn-primary" style="font-size:0.75rem;padding:0.25rem 0.6rem;background:var(--color-primary);" onclick="triggerEmailReview('${log.id}')">Override & Save</button>`;
+      actionsHtml += `<button class="btn btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;color:#e74c3c;border-color:rgba(231,76,60,0.3);" onclick="declineEmailBooking('${log.id}')">✗ Decline</button>`;
+      if (log.replyDraft) {
+        actionsHtml += `<button class="btn btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;" onclick="copyEmailReply('${log.id}')">📋 Copy Reply</button>`;
+      }
+    } else if (log.status === "Auto-Saved" || log.status === "Confirmed" || log.status === "Resolved") {
+      actionsHtml += `<button class="btn btn-accent" style="font-size:0.75rem;padding:0.25rem 0.7rem;" onclick="copyEmailReply('${log.id}')">📋 Copy Confirmation Reply</button>`;
+    } else if (log.status === "Declined") {
+      actionsHtml += `<button class="btn btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.6rem;" onclick="copyEmailReply('${log.id}')">📋 Copy Decline Reply</button>`;
+    } else if (log.status === "Replied") {
+      actionsHtml += `<span style="font-size:0.75rem;color:var(--color-text-muted);font-style:italic;align-self:center;">Reply sent ✓</span>`;
+    }
+
+    actionsHtml += `</div>`;
+
     item.innerHTML = `
       <div class="email-log-header">
         <span class="email-log-subject">${log.subject}</span>
         <span class="email-log-status ${statusClass}">${log.status}</span>
       </div>
-      <div style="font-size: 0.8rem; color: var(--color-text-light);">From: ${log.sender}</div>
+      <div style="font-size:0.8rem;color:var(--color-text-light);">From: ${log.sender}</div>
       <div class="email-log-details">
         Parsed: <strong>${log.parsedData.name}</strong> (${log.parsedData.partySize} pax) on <strong>${log.parsedData.date}</strong> at <strong>${format12Hour(log.parsedData.timeSlot)}</strong>
       </div>
-      ${actionBtnHtml}
+      ${alternativesHtml}
+      ${actionsHtml}
     `;
     container.appendChild(item);
   });
 }
 
-// Review pending email booking
+// Review pending email booking (override/force-save despite conflict)
 window.triggerEmailReview = function(refCode) {
   const log = processedEmails.find(e => e.id === refCode);
   if (!log) return;
-  
+
   const conflict = checkConflict(log.booking.tableId, log.booking.date, log.booking.timeSlot, null, log.booking.partySize);
-  
+
   triggerConflictModal(log.booking, conflict || { guestName: "Requested Out-Of-Bounds Time Slot", timeSlot: log.booking.timeSlot, id: "N/A", tableId: log.booking.tableId });
-  
+
   const originalOverride = confirmConflictBypass;
   confirmConflictBypass = function() {
     originalOverride();
-    
+
     const logIdx = processedEmails.findIndex(e => e.id === refCode);
     if (logIdx !== -1) {
-      processedEmails[logIdx].status = "Resolved";
+      const confirmedReply = generateReplyDraft("confirmed", {
+        name: processedEmails[logIdx].parsedData.name,
+        partySize: processedEmails[logIdx].parsedData.partySize,
+        date: processedEmails[logIdx].parsedData.date,
+        timeSlot: processedEmails[logIdx].parsedData.timeSlot,
+        refCode
+      });
+      processedEmails[logIdx].status = "Confirmed";
+      processedEmails[logIdx].replyDraft = confirmedReply;
       renderEmailLog();
     }
-    
+
     confirmConflictBypass = originalOverride;
   };
+};
+
+// Copy the pre-generated reply draft for an email log entry
+window.copyEmailReply = function(refCode) {
+  const logIdx = processedEmails.findIndex(e => e.id === refCode);
+  if (logIdx === -1) return;
+  const log = processedEmails[logIdx];
+  if (!log.replyDraft) return;
+
+  const markReplied = () => {
+    if (log.status !== "Declined" && log.status !== "Replied") {
+      processedEmails[logIdx].status = "Replied";
+      renderEmailLog();
+    }
+  };
+
+  navigator.clipboard.writeText(log.replyDraft).then(() => {
+    markReplied();
+    showToast("Reply copied to clipboard!");
+  }).catch(() => {
+    showReplyModal(log.replyDraft);
+    markReplied();
+  });
+};
+
+// Decline a booking request and generate a decline reply
+window.declineEmailBooking = function(refCode) {
+  const logIdx = processedEmails.findIndex(e => e.id === refCode);
+  if (logIdx === -1) return;
+  const log = processedEmails[logIdx];
+
+  const declineReply = generateReplyDraft("declined", {
+    name: log.parsedData.name,
+    partySize: log.parsedData.partySize,
+    date: log.parsedData.date,
+    timeSlot: log.parsedData.timeSlot,
+    refCode
+  });
+
+  processedEmails[logIdx].status = "Declined";
+  processedEmails[logIdx].replyDraft = declineReply;
+  renderEmailLog();
+
+  navigator.clipboard.writeText(declineReply).then(() => {
+    showToast("Decline reply copied to clipboard!");
+  }).catch(() => {
+    showReplyModal(declineReply);
+  });
+};
+
+// Confirm a specific alternative slot for a conflicted email booking
+window.confirmAlternativeSlot = function(refCode, altIdx) {
+  const logIdx = processedEmails.findIndex(e => e.id === refCode);
+  if (logIdx === -1) return;
+  const log = processedEmails[logIdx];
+  const alt = log.alternatives && log.alternatives[altIdx];
+  if (!alt) return;
+
+  const updatedBooking = { ...log.booking, timeSlot: alt.timeSlot, tableId: alt.tableId, hasConflict: false };
+  const current = getReservations();
+  current.push(updatedBooking);
+  saveAllReservations(current);
+
+  const confirmedReply = generateReplyDraft("confirmed", {
+    name: log.parsedData.name,
+    partySize: log.parsedData.partySize,
+    date: log.parsedData.date,
+    timeSlot: alt.timeSlot,
+    refCode
+  });
+
+  processedEmails[logIdx].status = "Confirmed";
+  processedEmails[logIdx].replyDraft = confirmedReply;
+  renderEmailLog();
+  renderBookingsList();
+
+  showToast(`✓ Booked at ${format12Hour(alt.timeSlot)}! Reply ready to copy.`);
 };
 
 // ==========================================
